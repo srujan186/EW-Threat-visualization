@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Radar Display - Su-30 (Multi-Threat)</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0a0e27;
+            color: #00ff00;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            display: flex;
+            gap: 30px;
+            max-width: 1400px;
+            width: 100%;
+        }
+
+        .radar-container {
+            background: #0d1124;
+            border: 2px solid #1a3a52;
+            border-radius: 10px;
+            padding: 20px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .radar-title {
+            color: #00ddff;
+            font-size: 24px;
+            margin-bottom: 20px;
+            text-align: center;
+            letter-spacing: 2px;
+        }
+
+        canvas {
+            background: #050814;
+            border: 2px solid #1a3a52;
+            border-radius: 5px;
+            box-shadow: 0 0 20px rgba(0, 100, 150, 0.3);
+        }
+
+        .controls {
+            background: #0d1124;
+            border: 2px solid #1a3a52;
+            border-radius: 10px;
+            padding: 30px;
+            width: 400px;
+            height: fit-content;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .controls::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .controls::-webkit-scrollbar-track {
+            background: #050814;
+            border-radius: 4px;
+        }
+
+        .controls::-webkit-scrollbar-thumb {
+            background: #1a3a52;
+            border-radius: 4px;
+        }
+
+        .controls::-webkit-scrollbar-thumb:hover {
+            background: #00ddff;
+        }
+
+        .control-group {
+            margin-bottom: 25px;
+        }
+
+        .control-group label {
+            display: block;
+            color: #00ddff;
+            margin-bottom: 8px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        select, input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            background: #050814;
+            border: 2px solid #1a3a52;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: #00ddff;
+        }
+
+        .info-display {
+            background: #050814;
+            border: 2px solid #1a3a52;
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 13px;
+        }
+
+        .info-label {
+            color: #888;
+        }
+
+        .info-value {
+            color: #00ff00;
+            font-weight: bold;
+        }
+
+        .legend {
+            background: #050814;
+            border: 2px solid #1a3a52;
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+
+        .legend-title {
+            color: #00ddff;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 12px;
+        }
+
+        .legend-symbol {
+            width: 30px;
+            height: 15px;
+            margin-right: 10px;
+            border-radius: 2px;
+        }
+
+        .controls-title {
+            color: #00ddff;
+            font-size: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+            letter-spacing: 2px;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #1a3a52;
+            border: 2px solid #00ddff;
+            color: #00ddff;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background: #00ddff;
+            color: #0d1124;
+        }
+
+        #clearButton:hover {
+            background: #ff4444 !important;
+            color: #ffffff !important;
+        }
+
+        .sweep-toggle {
+            margin-top: 15px;
+        }
+
+        .threat-item {
+            background: #050814;
+            border: 2px solid #1a3a52;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            overflow: hidden;
+            transition: all 0.3s;
+        }
+
+        .threat-header {
+            padding: 12px 15px;
+            background: #0d1124;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .threat-header:hover {
+            background: #1a2542;
+        }
+
+        .threat-header.active {
+            background: #1a3a52;
+        }
+
+        .threat-title {
+            color: #00ddff;
+            font-weight: bold;
+            font-size: 13px;
+        }
+
+        .threat-toggle {
+            color: #00ff00;
+            font-size: 18px;
+            transition: transform 0.3s;
+        }
+
+        .threat-toggle.open {
+            transform: rotate(180deg);
+        }
+
+        .threat-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+            padding: 0 15px;
+        }
+
+        .threat-content.open {
+            max-height: 500px;
+            padding: 15px;
+            transition: max-height 0.4s ease-in;
+        }
+
+        .threat-content .control-group {
+            margin-bottom: 15px;
+        }
+
+        .threat-content .control-group label {
+            font-size: 12px;
+            color: #888;
+        }
+
+        .threat-content input,
+        .threat-content select {
+            font-size: 12px;
+            padding: 8px;
+        }
+
+        .threats-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 2px solid #1a3a52;
+        }
+
+        .section-title {
+            color: #00ddff;
+            font-size: 16px;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+
+        .threat-color-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+            border: 1px solid #1a3a52;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="radar-container">
+            <div class="radar-title">EW THREAT DISPLAY - SU-30</div>
+            <canvas id="radarCanvas" width="700" height="700"></canvas>
+        </div>
+
+        <div class="controls">
+            <div class="controls-title">EMITTER PARAMETERS</div>
+            
+            <div class="control-group">
+                <label>THREAT TYPE</label>
+                <select id="threatType">
+                    <option value="search">Search (□)</option>
+                    <option value="track">Track (△)</option>
+                    <option value="trackWhileScan">Track While Scan (◇)</option>
+                    <option value="acquisition">Acquisition (✱)</option>
+                    <option value="missile">Missile (⊕)</option>
+                    <option value="unknown">Unknown (#)</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label>NUMBER OF THREATS (1-16)</label>
+                <input type="number" id="numThreats" min="1" max="16" value="1" step="1">
+            </div>
+
+            <div class="control-group sweep-toggle">
+                <button id="sweepToggle">START SWEEP</button>
+            </div>
+
+            <div class="control-group">
+                <button id="clearButton" style="background: #8b0000; border-color: #ff4444;">CLEAR ALL THREATS</button>
+            </div>
+
+            <div class="info-display">
+                <div class="info-row">
+                    <span class="info-label">Active Threat Type:</span>
+                    <span class="info-value" id="activeThreat">SEARCH</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Active Threats:</span>
+                    <span class="info-value" id="activeThreatsCount">1</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Aircraft:</span>
+                    <span class="info-value">Su-30MKI</span>
+                </div>
+            </div>
+
+            <div class="threats-section">
+                <div class="section-title">THREAT CONFIGURATIONS</div>
+                <div id="threatsContainer"></div>
+            </div>
+
+            <div class="legend">
+                <div class="legend-title">THREAT INDICATORS</div>
+                <div class="legend-item">
+                    <div class="legend-symbol" style="background: rgba(0, 255, 0, 0.3); border: 1px solid #00ff00;"></div>
+                    <span>LHPD (Left)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-symbol" style="background: rgba(100, 200, 255, 0.3); border: 1px solid #64c8ff;"></div>
+                    <span>RHPD (Right)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-symbol" style="background: rgba(255, 255, 0, 0.2); border: 1px solid #ffff00;"></div>
+                    <span>Scan Center</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-symbol" style="background: rgba(255, 255, 0, 0.1); border: 1px dashed #ffff00;"></div>
+                    <span>Elevation Pages</span>
+                </div>
+                <div style="margin-top: 15px; font-size: 11px; color: #888;">
+                    □ Search | △ Track | ◇ TWS<br>
+                    ✱ Acquisition | ⊕ Missile | # Unknown
+                </div>
+                <div style="margin-top: 10px; font-size: 10px; color: #666; line-height: 1.4;">
+                    <strong style="color: #888;">Pages:</strong> Number of elevation scans<br>
+                    1 page = 2D horizontal scan<br>
+                    2+ pages = 3D volumetric coverage
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('radarCanvas');
+        const ctx = canvas.getContext('2d');
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        const maxRadius = 300;
+
+        // Load aircraft image
+        const aircraftImg = new Image();
+        aircraftImg.src = 'data:image/png;base64,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';
+
+        // Threat colors for visual differentiation
+        const threatColors = [
+            '#ff0000', '#00ff00', '#ffff00', '#ff00ff', '#00ffff', '#ff8800',
+            '#0088ff', '#88ff00', '#ff0088', '#8800ff', '#ff8888', '#88ff88',
+            '#ffff88', '#ff88ff', '#88ffff', '#ffffff'
+        ];
+
+        // Radar state
+        let radarState = {
+            threatType: 'search',
+            numThreats: 1,
+            sweepAngle: 0,
+            sweepActive: false,
+            threats: []
+        };
+
+        // Predefined threat configurations based on the notebook
+        const threatPresets = {
+            search: { direction: 0, angle: 30, range: 40, pages: 2 },
+            track: { direction: 0, angle: 20, range: 60, pages: 1 },
+            trackWhileScan: { direction: 0, angle: 10, range: 40, pages: 1 },
+            acquisition: { direction: 0, angle: 55, range: 40, pages: 2 },
+            missile: { direction: 0, angle: 10, range: 20, pages: 1 },
+            unknown: { direction: 0, angle: 180, range: 20, pages: 1 }
+        };
+
+        // Initialize threats
+        function initializeThreats() {
+            radarState.threats = [];
+            const preset = threatPresets[radarState.threatType];
+            
+            for (let i = 0; i < radarState.numThreats; i++) {
+                const angle = (360 / radarState.numThreats) * i;
+                radarState.threats.push({
+                    id: i + 1,
+                    scanDirection: angle,
+                    scanAngle: preset.angle,
+                    range: preset.range,
+                    numPages: preset.pages,
+                    color: threatColors[i % threatColors.length]
+                });
+            }
+        }
+
+        // Create threat UI elements
+        function createThreatsUI() {
+            const container = document.getElementById('threatsContainer');
+            container.innerHTML = '';
+
+            radarState.threats.forEach((threat, index) => {
+                const threatItem = document.createElement('div');
+                threatItem.className = 'threat-item';
+                
+                const isOpen = index === 0; // First threat open by default
+                
+                threatItem.innerHTML = `
+                    <div class="threat-header" onclick="toggleThreat(${index})">
+                        <div>
+                            <span class="threat-color-indicator" style="background: ${threat.color};"></span>
+                            <span class="threat-title">Threat ${threat.id} - ${radarState.threatType.toUpperCase()}</span>
+                        </div>
+                        <span class="threat-toggle ${isOpen ? 'open' : ''}">▼</span>
+                    </div>
+                    <div class="threat-content ${isOpen ? 'open' : ''}" id="threat-content-${index}">
+                        <div class="control-group">
+                            <label>SCAN DIRECTION (degrees)</label>
+                            <input type="number" min="-180" max="180" value="${threat.scanDirection}" step="1"
+                                   onchange="updateThreat(${index}, 'scanDirection', this.value)">
+                        </div>
+                        <div class="control-group">
+                            <label>SCAN ANGLE (±degrees)</label>
+                            <input type="number" min="0" max="180" value="${threat.scanAngle}" step="1"
+                                   onchange="updateThreat(${index}, 'scanAngle', this.value)">
+                        </div>
+                        <div class="control-group">
+                            <label>RANGE (km)</label>
+                            <input type="number" min="20" max="200" value="${threat.range}" step="20"
+                                   onchange="updateThreat(${index}, 'range', this.value)">
+                        </div>
+                        <div class="control-group">
+                            <label>NUMBER OF PAGES (Elevation Scans)</label>
+                            <input type="number" min="1" max="10" value="${threat.numPages}" step="1"
+                                   onchange="updateThreat(${index}, 'numPages', this.value)">
+                        </div>
+                    </div>
+                `;
+                
+                container.appendChild(threatItem);
+            });
+        }
+
+        // Toggle threat panel
+        window.toggleThreat = function(index) {
+            const content = document.getElementById(`threat-content-${index}`);
+            const header = content.previousElementSibling;
+            const toggle = header.querySelector('.threat-toggle');
+            
+            const isOpen = content.classList.contains('open');
+            
+            if (isOpen) {
+                content.classList.remove('open');
+                toggle.classList.remove('open');
+                header.classList.remove('active');
+            } else {
+                content.classList.add('open');
+                toggle.classList.add('open');
+                header.classList.add('active');
+            }
+        };
+
+        // Update individual threat
+        window.updateThreat = function(index, field, value) {
+            radarState.threats[index][field] = field === 'units' ? value : parseFloat(value);
+        };
+
+        // Event listeners
+        document.getElementById('threatType').addEventListener('change', function(e) {
+            radarState.threatType = e.target.value;
+            initializeThreats();
+            createThreatsUI();
+            updateDisplay();
+        });
+
+        document.getElementById('numThreats').addEventListener('input', function(e) {
+            radarState.numThreats = Math.max(1, Math.min(16, parseInt(e.target.value)));
+            this.value = radarState.numThreats;
+            initializeThreats();
+            createThreatsUI();
+            updateDisplay();
+        });
+
+        document.getElementById('sweepToggle').addEventListener('click', function() {
+            radarState.sweepActive = !radarState.sweepActive;
+            this.textContent = radarState.sweepActive ? 'STOP SWEEP' : 'START SWEEP';
+        });
+
+        document.getElementById('clearButton').addEventListener('click', function() {
+            clearAllThreats();
+        });
+
+        function clearAllThreats() {
+            // Reset to defaults
+            radarState.threatType = 'search';
+            radarState.numThreats = 1;
+            radarState.sweepActive = false;
+            radarState.threats = [];
+            
+            // Reset UI controls
+            document.getElementById('threatType').value = 'search';
+            document.getElementById('numThreats').value = 1;
+            document.getElementById('sweepToggle').textContent = 'START SWEEP';
+            
+            // Reinitialize
+            initializeThreats();
+            createThreatsUI();
+            updateDisplay();
+        }
+
+        function updateDisplay() {
+            const threatNames = {
+                search: 'SEARCH',
+                track: 'TRACK',
+                trackWhileScan: 'TRACK WHILE SCAN',
+                acquisition: 'ACQUISITION',
+                missile: 'MISSILE',
+                unknown: 'UNKNOWN'
+            };
+
+            document.getElementById('activeThreat').textContent = threatNames[radarState.threatType];
+            document.getElementById('activeThreatsCount').textContent = radarState.numThreats;
+        }
+
+        function convertDistance(valueInKm, unit) {
+            return Math.floor(valueInKm / 20);
+        }
+
+        function getUnitLabel() {
+            return '';
+        }
+
+        function drawRadar() {
+            // Clear canvas
+            ctx.fillStyle = '#050814';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw diagonal split background
+            ctx.fillStyle = 'rgba(0, 255, 0, 0.15)';
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.arc(centerX, centerY, maxRadius, degreesToRadians(45 - 90), degreesToRadians(225 - 90));
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = 'rgba(100, 200, 255, 0.15)';
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.arc(centerX, centerY, maxRadius, degreesToRadians(225 - 90), degreesToRadians(45 - 90 + 360));
+            ctx.closePath();
+            ctx.fill();
+
+            // Draw diagonal dividing lines
+            ctx.strokeStyle = 'rgba(150, 150, 150, 0.4)';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([5, 5]);
+            
+            const diagAngle45 = degreesToRadians(45 - 90);
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(centerX + Math.cos(diagAngle45) * maxRadius, centerY + Math.sin(diagAngle45) * maxRadius);
+            ctx.stroke();
+            
+            const diagAngle225 = degreesToRadians(225 - 90);
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(centerX + Math.cos(diagAngle225) * maxRadius, centerY + Math.sin(diagAngle225) * maxRadius);
+            ctx.stroke();
+            
+            ctx.setLineDash([]);
+
+            // Draw range rings
+            const ringSpacing = 20;
+            const maxDisplayRange = 200;
+            const numRings = 10;
+            const pixelsPerKm = maxRadius / maxDisplayRange;
+            
+            for (let i = 1; i <= numRings; i++) {
+                const rangeKm = ringSpacing * i;
+                const radius = rangeKm * pixelsPerKm;
+                
+                ctx.strokeStyle = '#1a3a52';
+                ctx.lineWidth = 1;
+                
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+                ctx.stroke();
+
+                const displayValue = convertDistance(rangeKm, '1').toFixed(0);
+                ctx.fillStyle = '#4a6a82';
+                ctx.font = '11px Courier New';
+                ctx.fillText(displayValue + getUnitLabel(), centerX + 5, centerY - radius + 5);
+            }
+
+            // Draw cardinal direction lines and labels
+            ctx.strokeStyle = '#1a3a52';
+            ctx.lineWidth = 1;
+            
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(centerX, centerY - maxRadius);
+            ctx.stroke();
+            ctx.fillStyle = '#00ddff';
+            ctx.font = 'bold 14px Courier New';
+            ctx.fillText('0°', centerX - 10, centerY - maxRadius - 10);
+
+            const angle45 = degreesToRadians(45 - 90);
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(centerX + Math.cos(angle45) * maxRadius, centerY + Math.sin(angle45) * maxRadius);
+            ctx.stroke();
+            ctx.fillText('45°', centerX + Math.cos(angle45) * (maxRadius + 15), centerY + Math.sin(angle45) * (maxRadius + 15));
+
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(centerX + maxRadius, centerY);
+            ctx.stroke();
+            ctx.fillText('90°', centerX + maxRadius + 10, centerY + 5);
+
+            const angle135 = degreesToRadians(135 - 90);
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(centerX + Math.cos(angle135) * maxRadius, centerY + Math.sin(angle135) * maxRadius);
+            ctx.stroke();
+            ctx.fillText('135°', centerX + Math.cos(angle135) * (maxRadius + 20), centerY + Math.sin(angle135) * (maxRadius + 15));
+
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(centerX, centerY + maxRadius);
+            ctx.stroke();
+            ctx.fillText('-180°/180°', centerX - 30, centerY + maxRadius + 20);
+
+            const angleMinus135 = degreesToRadians(-135 - 90);
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(centerX + Math.cos(angleMinus135) * maxRadius, centerY + Math.sin(angleMinus135) * maxRadius);
+            ctx.stroke();
+            ctx.fillText('-135°', centerX + Math.cos(angleMinus135) * (maxRadius + 25), centerY + Math.sin(angleMinus135) * (maxRadius + 15));
+
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(centerX - maxRadius, centerY);
+            ctx.stroke();
+            ctx.fillText('-90°', centerX - maxRadius - 35, centerY + 5);
+
+            const angleMinus45 = degreesToRadians(-45 - 90);
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(centerX + Math.cos(angleMinus45) * maxRadius, centerY + Math.sin(angleMinus45) * maxRadius);
+            ctx.stroke();
+            ctx.fillText('-45°', centerX + Math.cos(angleMinus45) * (maxRadius + 20), centerY + Math.sin(angleMinus45) * (maxRadius + 15));
+
+            // Draw all threat sectors
+            radarState.threats.forEach(threat => {
+                drawThreatSector(threat);
+            });
+
+            // Draw sweep line if active
+            if (radarState.sweepActive) {
+                drawSweepLine();
+            }
+
+            // Draw aircraft
+            drawAircraft();
+
+            // Draw threat symbols
+            radarState.threats.forEach(threat => {
+                drawThreatSymbol(threat);
+            });
+        }
+
+        function drawThreatSector(threat) {
+            const maxDisplayRange = 200;
+            const pixelsPerKm = maxRadius / maxDisplayRange;
+            const selectedRangeRadius = threat.range * pixelsPerKm;
+            
+            const startAngle = degreesToRadians(threat.scanDirection - threat.scanAngle - 90);
+            const endAngle = degreesToRadians(threat.scanDirection + threat.scanAngle - 90);
+
+            // Convert hex color to rgb for alpha
+            const color = threat.color;
+            const r = parseInt(color.slice(1, 3), 16);
+            const g = parseInt(color.slice(3, 5), 16);
+            const b = parseInt(color.slice(5, 7), 16);
+
+            // Draw hostile sector - extend to full maxRadius
+            ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.08)`;
+            ctx.strokeStyle = threat.color;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.arc(centerX, centerY, selectedRangeRadius, startAngle, endAngle);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Draw active range indicator
+            ctx.strokeStyle = threat.color;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, selectedRangeRadius, startAngle, endAngle);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Draw page indicators
+            if (threat.numPages > 1) {
+                ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, 0.3)`;
+                ctx.lineWidth = 1;
+                ctx.setLineDash([3, 3]);
+                for (let page = 1; page < threat.numPages; page++) {
+                    const pageRadius = selectedRangeRadius * (page / threat.numPages);
+                    ctx.beginPath();
+                    ctx.arc(centerX, centerY, pageRadius, startAngle, endAngle);
+                    ctx.stroke();
+                }
+                ctx.setLineDash([]);
+            }
+
+            // Draw sector boundary lines - extend to selected range
+            ctx.strokeStyle = threat.color;
+            ctx.lineWidth = 2;
+            
+            const leftAngle = degreesToRadians(threat.scanDirection - threat.scanAngle);
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(
+                centerX + Math.cos(degreesToRadians(leftAngle - 90)) * selectedRangeRadius,
+                centerY + Math.sin(degreesToRadians(leftAngle - 90)) * selectedRangeRadius
+            );
+            ctx.stroke();
+
+            const rightAngle = degreesToRadians(threat.scanDirection + threat.scanAngle);
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(
+                centerX + Math.cos(degreesToRadians(rightAngle - 90)) * selectedRangeRadius,
+                centerY + Math.sin(degreesToRadians(rightAngle - 90)) * selectedRangeRadius
+            );
+            ctx.stroke();
+
+            // Draw center direction indicator
+            const centerAngle = degreesToRadians(threat.scanDirection - 90);
+            ctx.strokeStyle = threat.color;
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([8, 4]);
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(
+                centerX + Math.cos(centerAngle) * selectedRangeRadius * 0.7,
+                centerY + Math.sin(centerAngle) * selectedRangeRadius * 0.7
+            );
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        function drawSweepLine() {
+            const sweepSpeed = 1.0;
+            radarState.sweepAngle += sweepSpeed;
+            if (radarState.sweepAngle >= 360) radarState.sweepAngle = 0;
+
+            const angle = degreesToRadians(radarState.sweepAngle - 90);
+            const sweepRadius = maxRadius;
+            
+            const gradient = ctx.createLinearGradient(
+                centerX, centerY,
+                centerX + Math.cos(angle) * sweepRadius,
+                centerY + Math.sin(angle) * sweepRadius
+            );
+            
+            gradient.addColorStop(0, 'rgba(0, 200, 255, 0.8)');
+            gradient.addColorStop(1, 'rgba(0, 200, 255, 0)');
+
+            ctx.strokeStyle = gradient;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(
+                centerX + Math.cos(angle) * sweepRadius,
+                centerY + Math.sin(angle) * sweepRadius
+            );
+            ctx.stroke();
+        }
+
+        function drawAircraft() {
+            ctx.save();
+            
+            const imgWidth = 176;
+            const imgHeight = 100;
+            ctx.drawImage(aircraftImg, centerX - imgWidth/2, centerY - imgHeight/2, imgWidth, imgHeight);
+
+            ctx.fillStyle = '#00ddff';
+            ctx.font = 'bold 11px Courier New';
+            ctx.fillText('LHPD', centerX - imgWidth/2 - 40, centerY + 5);
+            ctx.fillText('RHPD', centerX + imgWidth/2 + 10, centerY + 5);
+
+            ctx.fillStyle = '#ff0000';
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function drawThreatSymbol(threat) {
+            const maxDisplayRange = 200;
+            const pixelsPerKm = maxRadius / maxDisplayRange;
+            const symbolDistance = threat.range * pixelsPerKm; // Place at the range border
+            const symbolAngle = degreesToRadians(threat.scanDirection - 90);
+            
+            const symbolX = centerX + Math.cos(symbolAngle) * symbolDistance;
+            const symbolY = centerY + Math.sin(symbolAngle) * symbolDistance;
+            
+            ctx.save();
+            ctx.translate(symbolX, symbolY);
+            
+            ctx.fillStyle = '#ffffff';
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+
+            switch(radarState.threatType) {
+                case 'search':
+                    ctx.strokeRect(-8, -8, 16, 16);
+                    break;
+                case 'track':
+                    ctx.beginPath();
+                    ctx.moveTo(0, -10);
+                    ctx.lineTo(-9, 8);
+                    ctx.lineTo(9, 8);
+                    ctx.closePath();
+                    ctx.stroke();
+                    ctx.fill();
+                    break;
+                case 'trackWhileScan':
+                    ctx.beginPath();
+                    ctx.moveTo(0, -10);
+                    ctx.lineTo(10, 0);
+                    ctx.lineTo(0, 10);
+                    ctx.lineTo(-10, 0);
+                    ctx.closePath();
+                    ctx.stroke();
+                    break;
+                case 'acquisition':
+                    ctx.font = 'bold 24px Courier New';
+                    ctx.fillText('✱', -8, 8);
+                    break;
+                case 'missile':
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 9, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(-9, 0);
+                    ctx.lineTo(9, 0);
+                    ctx.moveTo(0, -9);
+                    ctx.lineTo(0, 9);
+                    ctx.stroke();
+                    break;
+                case 'unknown':
+                    ctx.font = 'bold 24px Courier New';
+                    ctx.fillText('#', -8, 8);
+                    break;
+            }
+
+            // Draw threat ID
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 10px Courier New';
+            ctx.fillText('T' + threat.id, 12, -5);
+
+            ctx.restore();
+        }
+
+        function degreesToRadians(degrees) {
+            return degrees * (Math.PI / 180);
+        }
+
+        function animate() {
+            drawRadar();
+            requestAnimationFrame(animate);
+        }
+
+        // Initialize
+        initializeThreats();
+        createThreatsUI();
+        updateDisplay();
+        animate();
+    </script>
+</body>
+</html>
