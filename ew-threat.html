@@ -239,93 +239,6 @@
             margin-right: 8px;
         }
 
-        .missile-section {
-            margin-top: 20px;
-            padding-top: 20px;
-            border-top: 2px solid #ff4400;
-        }
-
-        .missile-section .section-title { color: #ff6600; }
-
-        .missile-item {
-            background: #050814;
-            border: 2px solid #ff4400;
-            border-radius: 5px;
-            margin-bottom: 12px;
-            overflow: hidden;
-        }
-
-        .missile-header {
-            padding: 10px 15px;
-            background: #1a0800;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            cursor: pointer;
-            user-select: none;
-        }
-
-        .missile-header:hover { background: #2a1200; }
-
-        .missile-title { color: #ff6600; font-weight: bold; font-size: 13px; }
-
-        .missile-toggle {
-            color: #ff6600;
-            font-size: 18px;
-            transition: transform 0.3s;
-        }
-
-        .missile-toggle.open { transform: rotate(180deg); }
-
-        .missile-content {
-            max-height: 0;
-            overflow: hidden;
-            transition: max-height 0.3s ease-out;
-            padding: 0 15px;
-        }
-
-        .missile-content.open {
-            max-height: 400px;
-            padding: 15px;
-            transition: max-height 0.4s ease-in;
-        }
-
-        .missile-content .control-group { margin-bottom: 12px; }
-        .missile-content .control-group label { font-size: 12px; color: #ff8844; }
-        .missile-content input { font-size: 12px; padding: 8px; border-color: #ff4400; }
-        .missile-content input:focus { border-color: #ff8800; }
-
-        .missile-status {
-            font-size: 11px;
-            padding: 4px 8px;
-            border-radius: 3px;
-            font-weight: bold;
-        }
-
-        .status-active { background: #002200; color: #00ff00; border: 1px solid #00ff00; }
-        .status-done   { background: #220000; color: #ff4444; border: 1px solid #ff4444; }
-        .status-idle   { background: #111122; color: #888888; border: 1px solid #444; }
-
-        .row2 { display: flex; gap: 8px; }
-        .row2 .control-group { flex: 1; }
-
-        .launch-btn {
-            width: 100%;
-            padding: 8px;
-            background: #8b0000;
-            border: 2px solid #ff4400;
-            color: #ff8800;
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            margin-top: 5px;
-            transition: all 0.3s;
-        }
-
-        .launch-btn:hover { background: #ff4400; color: #fff; }
-        .launch-btn.launched { background: #003300; border-color: #00ff00; color: #00ff00; }
-
         /* ══════════════════════════════════════
            NEW: ENEMY AIRCRAFT SECTION STYLES
         ══════════════════════════════════════ */
@@ -483,10 +396,6 @@
                 <span class="info-value" id="activeThreatsCount">1</span>
             </div>
             <div class="info-row">
-                <span class="info-label">Active Missiles:</span>
-                <span class="info-value" id="activeMissilesCount">0</span>
-            </div>
-            <div class="info-row">
                 <span class="info-label">Sweep Pattern:</span>
                 <span class="info-value" id="sweepPatternInfo">STRAIGHT</span>
             </div>
@@ -508,19 +417,6 @@
         <div class="threats-section">
             <div class="section-title">THREAT CONFIGURATIONS</div>
             <div id="threatsContainer"></div>
-        </div>
-
-        <!-- MISSILE SECTION -->
-        <div class="missile-section">
-            <div class="section-title">🚀 MISSILE TRACKS</div>
-            <div class="control-group">
-                <label>NUMBER OF MISSILES (1–8)</label>
-                <input type="number" id="numMissiles" min="1" max="8" value="1" step="1">
-            </div>
-            <button id="clearMissilesBtn" style="background:#4a2000;border-color:#ff8800;color:#ff8800;">
-                CLEAR ALL MISSILES
-            </button>
-            <div id="missilesContainer" style="margin-top:15px;"></div>
         </div>
 
         <!-- ══════════════════════════════════════
@@ -579,10 +475,6 @@
                 <span>RHPD (Right)</span>
             </div>
             <div class="legend-item">
-                <div class="legend-symbol" style="background:rgba(255,100,0,0.4);border:1px solid #ff6600;"></div>
-                <span>Missile Track</span>
-            </div>
-            <div class="legend-item">
                 <div class="legend-symbol" style="background:rgba(255,0,68,0.3);border:1px solid #ff0044;"></div>
                 <span>Enemy Aircraft</span>
             </div>
@@ -635,8 +527,6 @@ const THREAT_COLORS = [
     '#ffff88','#ff88ff','#88ffff','#ffffff'
 ];
 
-const MISSILE_COLORS = ['#ff6600','#ff00ff','#00ffff','#ffff00','#ff4444','#44ff44','#4444ff','#ffffff'];
-
 /* ─── state ─── */
 let radarState = {
     threatType  : 'search',
@@ -646,7 +536,6 @@ let radarState = {
     sweepPattern: 'straight',
     sweepTime   : 0,
     threats     : [],
-    missiles    : [],
 
     /* ══ NEW: enemy aircraft state ══ */
     enemy: {
@@ -759,193 +648,6 @@ window.toggleThreat = function(i) {
 window.updateThreat = function(i, field, val) {
     radarState.threats[i][field] = parseFloat(val);
 };
-
-/* ══════════════════════════════════════
-   MISSILE logic
-══════════════════════════════════════ */
-function initializeMissiles(n) {
-    while (radarState.missiles.length < n) {
-        const id = radarState.missiles.length + 1;
-        radarState.missiles.push({
-            id,
-            startAngle : 0,
-            startRange : 20,
-            endAngle   : 90,
-            endRange   : 100,
-            speed      : 2,
-            progress   : 0,
-            active     : false,
-            color      : MISSILE_COLORS[(id - 1) % MISSILE_COLORS.length],
-            trail      : []
-        });
-    }
-    radarState.missiles = radarState.missiles.slice(0, n);
-}
-
-function createMissilesUI() {
-    const c = document.getElementById('missilesContainer');
-    c.innerHTML = '';
-    radarState.missiles.forEach((m, i) => {
-        const div = document.createElement('div');
-        div.className = 'missile-item';
-        div.id = `mi-${i}`;
-        div.innerHTML = `
-            <div class="missile-header" onclick="toggleMissile(${i})">
-                <div style="display:flex;align-items:center;gap:8px;">
-                    <span style="width:10px;height:10px;border-radius:50%;background:${m.color};display:inline-block;"></span>
-                    <span class="missile-title">Missile M${m.id}</span>
-                </div>
-                <div style="display:flex;align-items:center;gap:8px;">
-                    <span class="missile-status status-idle" id="mstatus-${i}">IDLE</span>
-                    <span class="missile-toggle">▼</span>
-                </div>
-            </div>
-            <div class="missile-content" id="mc-${i}">
-                <div class="row2">
-                    <div class="control-group">
-                        <label>START ANGLE (°)</label>
-                        <input type="number" min="-180" max="180" value="${m.startAngle}" step="1"
-                               oninput="updateMissile(${i},'startAngle',this.value)">
-                    </div>
-                    <div class="control-group">
-                        <label>START RANGE (km)</label>
-                        <input type="number" min="20" max="200" value="${m.startRange}" step="20"
-                               oninput="updateMissile(${i},'startRange',this.value)">
-                    </div>
-                </div>
-                <div class="row2">
-                    <div class="control-group">
-                        <label>END ANGLE (°)</label>
-                        <input type="number" min="-180" max="180" value="${m.endAngle}" step="1"
-                               oninput="updateMissile(${i},'endAngle',this.value)">
-                    </div>
-                    <div class="control-group">
-                        <label>END RANGE (km)</label>
-                        <input type="number" min="20" max="200" value="${m.endRange}" step="20"
-                               oninput="updateMissile(${i},'endRange',this.value)">
-                    </div>
-                </div>
-                <div class="control-group">
-                    <label>SPEED (1=slow → 10=fast)</label>
-                    <input type="number" min="1" max="10" value="${m.speed}" step="1"
-                           oninput="updateMissile(${i},'speed',this.value)">
-                </div>
-                <button class="launch-btn" id="launchBtn-${i}" onclick="launchMissile(${i})">
-                    🚀 LAUNCH MISSILE M${m.id}
-                </button>
-            </div>`;
-        c.appendChild(div);
-    });
-}
-
-window.toggleMissile = function(i) {
-    const content = document.getElementById(`mc-${i}`);
-    const toggle  = content.previousElementSibling.querySelector('.missile-toggle');
-    content.classList.toggle('open');
-    toggle .classList.toggle('open');
-};
-
-window.updateMissile = function(i, field, val) {
-    radarState.missiles[i][field] = parseFloat(val);
-    if (!radarState.missiles[i].active) {
-        radarState.missiles[i].progress = 0;
-        radarState.missiles[i].trail    = [];
-    }
-};
-
-window.launchMissile = function(i) {
-    const m = radarState.missiles[i];
-    m.progress = 0;
-    m.trail    = [];
-    m.active   = true;
-    const btn = document.getElementById(`launchBtn-${i}`);
-    btn.textContent = '✅ LAUNCHED';
-    btn.classList.add('launched');
-    setMissileStatus(i, 'active');
-    updateDisplay();
-};
-
-function setMissileStatus(i, state) {
-    const el = document.getElementById(`mstatus-${i}`);
-    if (!el) return;
-    el.className = 'missile-status';
-    if (state === 'active') { el.classList.add('status-active'); el.textContent = 'ACTIVE'; }
-    else if (state === 'done') { el.classList.add('status-done');   el.textContent = 'DONE';   }
-    else                       { el.classList.add('status-idle');   el.textContent = 'IDLE';   }
-}
-
-function updateMissiles() {
-    radarState.missiles.forEach((m, i) => {
-        if (!m.active) return;
-        const speedFactor = m.speed * 0.003;
-        m.progress = Math.min(1, m.progress + speedFactor);
-        const angle = m.startAngle + (m.endAngle - m.startAngle) * m.progress;
-        const range = m.startRange + (m.endRange - m.startRange) * m.progress;
-        const pos   = polarToXY(angle, range);
-        m.trail.push({ x: pos.x, y: pos.y });
-        if (m.trail.length > 40) m.trail.shift();
-        if (m.progress >= 1) {
-            m.active = false;
-            setMissileStatus(i, 'done');
-            const btn = document.getElementById(`launchBtn-${i}`);
-            if (btn) { btn.textContent = `🔄 RELAUNCH M${m.id}`; btn.classList.remove('launched'); }
-            updateDisplay();
-        }
-    });
-}
-
-function drawMissile(m) {
-    if (m.progress <= 0 || m.trail.length === 0) return;
-    if (m.trail.length > 1) {
-        for (let j = 1; j < m.trail.length; j++) {
-            const alpha = j / m.trail.length;
-            ctx.strokeStyle = hexToRgba(m.color, alpha * 0.7);
-            ctx.lineWidth   = 1.5;
-            ctx.beginPath();
-            ctx.moveTo(m.trail[j-1].x, m.trail[j-1].y);
-            ctx.lineTo(m.trail[j  ].x, m.trail[j  ].y);
-            ctx.stroke();
-        }
-    }
-    const pos = m.trail[m.trail.length - 1];
-    const grd = ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, 12);
-    grd.addColorStop(0, hexToRgba(m.color, 0.9));
-    grd.addColorStop(1, hexToRgba(m.color, 0));
-    ctx.fillStyle = grd;
-    ctx.beginPath();
-    ctx.arc(pos.x, pos.y, 12, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = m.color;
-    ctx.beginPath();
-    ctx.arc(pos.x, pos.y, 4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = m.color;
-    ctx.font = 'bold 11px Courier New';
-    ctx.fillText(`M${m.id}`, pos.x + 8, pos.y - 6);
-    if (m.progress < 1) {
-        const start = polarToXY(m.startAngle, m.startRange);
-        const end   = polarToXY(m.endAngle,   m.endRange);
-        ctx.strokeStyle = hexToRgba(m.color, 0.5);
-        ctx.lineWidth   = 1;
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        ctx.moveTo(start.x, start.y);
-        ctx.lineTo(end.x,   end.y);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.strokeStyle = m.color;
-        ctx.lineWidth   = 1.5;
-        ctx.beginPath();
-        ctx.arc(end.x, end.y, 8, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(end.x - 12, end.y);
-        ctx.lineTo(end.x + 12, end.y);
-        ctx.moveTo(end.x, end.y - 12);
-        ctx.lineTo(end.x, end.y + 12);
-        ctx.stroke();
-    }
-}
 
 function hexToRgba(hex, alpha) {
     const r = parseInt(hex.slice(1,3), 16);
@@ -1735,10 +1437,6 @@ function drawRadar() {
     // Threat sectors
     radarState.threats.forEach(t => drawThreatSector(t));
 
-    // User missiles
-    updateMissiles();
-    radarState.missiles.forEach(m => drawMissile(m));
-
     // Enemy aircraft (drawn below sweep so sweep overlays it naturally)
     updateEnemyAircraft();
     drawEnemyAircraft();
@@ -1912,8 +1610,6 @@ function updateDisplay() {
 
     document.getElementById('activeThreat').textContent       = names[radarState.threatType];
     document.getElementById('activeThreatsCount').textContent  = radarState.numThreats;
-    document.getElementById('activeMissilesCount').textContent =
-        radarState.missiles.filter(m => m.active).length;
     document.getElementById('sweepPatternInfo').textContent    = patternNames[radarState.sweepPattern];
     document.getElementById('enemyStatusInfo').textContent     = phaseLabels[radarState.enemy.phase] || 'STANDBY';
     document.getElementById('enemyPhaseDisplay').textContent   = phaseLabels[radarState.enemy.phase] || 'STANDBY';
@@ -1968,22 +1664,6 @@ document.getElementById('clearButton').addEventListener('click', function() {
     initializeThreats(); createThreatsUI(); updateDisplay();
 });
 
-document.getElementById('numMissiles').addEventListener('input', function() {
-    const n = Math.max(1, Math.min(8, parseInt(this.value)));
-    this.value = n;
-    initializeMissiles(n); createMissilesUI(); updateDisplay();
-});
-
-document.getElementById('clearMissilesBtn').addEventListener('click', function() {
-    radarState.missiles.forEach((m, i) => {
-        m.active = false; m.progress = 0; m.trail = [];
-        setMissileStatus(i, 'idle');
-        const btn = document.getElementById(`launchBtn-${i}`);
-        if (btn) { btn.textContent = `🚀 LAUNCH MISSILE M${m.id}`; btn.classList.remove('launched'); }
-    });
-    updateDisplay();
-});
-
 /* NEW: enemy aircraft buttons */
 document.getElementById('scrambleBtn').addEventListener('click', scrambleEnemy);
 document.getElementById('abortEnemyBtn').addEventListener('click', abortEnemy);
@@ -1993,8 +1673,6 @@ document.getElementById('abortEnemyBtn').addEventListener('click', abortEnemy);
 ══════════════════════════════════════ */
 initializeThreats();
 createThreatsUI();
-initializeMissiles(1);
-createMissilesUI();
 updateDisplay();
 
 function animate() {
