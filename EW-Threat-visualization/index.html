@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Radar Display - Su-30 (Multi-Threat)</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0a0e27;
+            color: #00ff00;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { display: flex; gap: 30px; max-width: 1700px; width: 100%; }
+        .radar-container {
+            background: #0d1124;
+            border: 2px solid #1a3a52;
+            border-radius: 10px;
+            padding: 20px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .radar-title { color: #00ddff; font-size: 22px; margin-bottom: 10px; text-align: center; letter-spacing: 2px; }
+        .pause-banner {
+            background: rgba(255,200,0,0.15); border: 1px solid #ffcc00; border-radius: 5px;
+            color: #ffcc00; font-size: 11px; letter-spacing: 2px; padding: 4px 14px;
+            margin-bottom: 8px; display: none; text-align: center;
+        }
+        .pause-banner.visible { display: block; }
+        canvas {
+            background: #050814;
+            border: 2px solid #1a3a52;
+            border-radius: 5px;
+            box-shadow: 0 0 20px rgba(0,100,150,0.3);
+            cursor: crosshair;
+        }
+        .controls {
+            background: #0d1124;
+            border: 2px solid #1a3a52;
+            border-radius: 10px;
+            padding: 24px;
+            width: 460px;
+            max-height: 97vh;
+            overflow-y: auto;
+        }
+        .controls::-webkit-scrollbar { width: 7px; }
+        .controls::-webkit-scrollbar-track { background: #050814; border-radius: 4px; }
+        .controls::-webkit-scrollbar-thumb { background: #1a3a52; border-radius: 4px; }
+        .controls::-webkit-scrollbar-thumb:hover { background: #00ddff; }
+        .controls-title { color: #00ddff; font-size: 18px; margin-bottom: 18px; text-align: center; letter-spacing: 2px; }
+        .control-group { margin-bottom: 14px; }
+        .control-group label { display: block; color: #00ddff; margin-bottom: 5px; font-size: 13px; font-weight: bold; }
+        select, input[type="number"] {
+            width: 100%; padding: 8px;
+            background: #050814; border: 2px solid #1a3a52;
+            color: #00ff00; font-family: 'Courier New', monospace;
+            font-size: 12px; border-radius: 5px; cursor: pointer;
+        }
+        select:focus, input:focus { outline: none; border-color: #00ddff; }
+        .row2 { display: flex; gap: 8px; }
+        .row2 .control-group { flex: 1; margin-bottom: 0; }
+        button {
+            width: 100%; padding: 10px;
+            background: #1a3a52; border: 2px solid #00ddff;
+            color: #00ddff; font-family: 'Courier New', monospace;
+            font-size: 13px; border-radius: 5px; cursor: pointer;
+            margin-top: 8px; transition: all 0.3s;
+        }
+        button:hover { background: #00ddff; color: #0d1124; }
+        .pause-btn {
+            background: #1a2a00; border-color: #aaff00; color: #aaff00;
+        }
+        .pause-btn:hover { background: #aaff00; color: #0d1124; }
+        .pause-btn.paused { background: #ffcc0022; border-color: #ffcc00; color: #ffcc00; animation: blink 1s infinite alternate; }
+        @keyframes blink { from { opacity:0.7; } to { opacity:1; } }
+        .info-display { background: #050814; border: 2px solid #1a3a52; border-radius: 5px; padding: 12px; margin-top: 14px; }
+        .info-row { display: flex; justify-content: space-between; margin-bottom: 7px; font-size: 12px; }
+        .info-label { color: #888; }
+        .info-value { color: #00ff00; font-weight: bold; }
+        .threats-section { margin-top: 16px; padding-top: 16px; border-top: 2px solid #1a3a52; }
+        .section-title { color: #00ddff; font-size: 14px; margin-bottom: 10px; font-weight: bold; }
+        .threat-item { background: #050814; border: 2px solid #1a3a52; border-radius: 5px; margin-bottom: 10px; overflow: hidden; }
+        .threat-header {
+            padding: 9px 13px; background: #0d1124;
+            display: flex; justify-content: space-between; align-items: center;
+            cursor: pointer; user-select: none;
+        }
+        .threat-header:hover { background: #1a2542; }
+        .threat-header.active { background: #1a3a52; }
+        .threat-title { color: #00ddff; font-weight: bold; font-size: 11px; }
+        .threat-toggle { color: #00ff00; font-size: 15px; transition: transform 0.3s; }
+        .threat-toggle.open { transform: rotate(180deg); }
+        .threat-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; padding: 0 13px; }
+        .threat-content.open { max-height: 1600px; padding: 13px; transition: max-height 0.5s ease-in; }
+        .threat-content .control-group { margin-bottom: 10px; }
+        .threat-content .control-group label { font-size: 10px; color: #888; }
+        .threat-content input, .threat-content select { font-size: 10px; padding: 6px; }
+        .threat-color-indicator { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+        .traj-panel { background: #060e1a; border: 1px solid #2a4a62; border-radius: 5px; padding: 10px; margin-top: 8px; }
+        .traj-panel-title { color: #ffaa00; font-size: 9px; font-weight: bold; letter-spacing: 1px; margin-bottom: 8px; }
+        .traj-sub { color: #00ddff; font-size: 9px; font-weight: bold; margin: 8px 0 5px; padding-top: 7px; border-top: 1px solid #1a3a52; }
+        .dynamic-opts { display: none; }
+        .dynamic-opts.show { display: block; }
+        .static-opts { display: block; }
+        .static-opts.hide { display: none; }
+        .badge {
+            display: inline-block; padding: 2px 7px; border-radius: 3px;
+            font-size: 9px; font-weight: bold; letter-spacing: 1px; margin-top: 4px;
+        }
+        .badge-static   { background:#112200; border:1px solid #44ff44; color:#44ff44; }
+        .badge-dynamic  { background:#002233; border:1px solid #00ddff; color:#00ddff; }
+        .badge-straight { background:#003322; border:1px solid #00ff88; color:#00ff88; }
+        .badge-scurve   { background:#002244; border:1px solid #44aaff; color:#44aaff; }
+        .badge-inbound  { background:#221100; border:1px solid #ff8800; color:#ff8800; }
+        .badge-outbound { background:#220022; border:1px solid #ff44ff; color:#ff44ff; }
+        /* Sweep panel */
+        .sweep-section { margin-top: 16px; padding-top: 16px; border-top: 2px solid #1a3a52; }
+        .sweep-panel { background: #050814; border: 2px solid #00ff88; border-radius: 5px; padding: 12px; }
+        .sweep-panel .control-group label { font-size: 10px; color: #00ff88; }
+        .sweep-panel input, .sweep-panel select { font-size: 10px; padding: 6px; border-color: #00ff88; color: #00ff88; }
+        .sweep-status-bar {
+            background: #001a0e; border: 1px solid #00ff88; border-radius: 4px;
+            padding: 6px 10px; margin-bottom: 9px; display: flex; justify-content: space-between; font-size: 11px;
+        }
+        .sweep-phase-value { color: #00ff88; font-weight: bold; letter-spacing: 1px; }
+        .sweep-btn {
+            width: 100%; padding: 10px; background: #001a0e; border: 2px solid #00ff88;
+            color: #00ff88; font-family: 'Courier New', monospace; font-size: 12px; font-weight: bold;
+            border-radius: 5px; cursor: pointer; margin-top: 4px; transition: all 0.3s; letter-spacing: 2px;
+        }
+        .sweep-btn:hover { background: #00ff88; color: #0d1124; }
+        .sweep-btn.active { background: #002a1a; border-color: #00ffaa; color: #00ffaa; animation: sg 1s infinite alternate; }
+        @keyframes sg { from { box-shadow: 0 0 4px rgba(0,255,136,0.3); } to { box-shadow: 0 0 12px rgba(0,255,136,0.9); } }
+        /* Enemy */
+        .enemy-section { margin-top: 16px; padding-top: 16px; border-top: 2px solid #ff0044; }
+        .enemy-section .section-title { color: #ff3366; }
+        .enemy-panel { background: #050814; border: 2px solid #ff0044; border-radius: 5px; padding: 12px; margin-bottom: 9px; }
+        .enemy-panel .control-group { margin-bottom: 9px; }
+        .enemy-panel .control-group label { font-size: 10px; color: #ff6688; }
+        .enemy-panel input, .enemy-panel select { font-size: 10px; padding: 6px; border-color: #ff0044; color: #ff8899; }
+        .enemy-status-bar {
+            background: #1a0010; border: 1px solid #ff0044; border-radius: 4px;
+            padding: 6px 10px; margin-bottom: 9px; display: flex; justify-content: space-between; font-size: 11px;
+        }
+        .enemy-phase-value { color: #ff3366; font-weight: bold; letter-spacing: 1px; }
+        .scramble-btn {
+            width: 100%; padding: 10px; background: #3a0010; border: 2px solid #ff0044;
+            color: #ff3366; font-family: 'Courier New', monospace; font-size: 12px; font-weight: bold;
+            border-radius: 5px; cursor: pointer; margin-top: 4px; transition: all 0.3s; letter-spacing: 2px;
+        }
+        .scramble-btn:hover { background: #ff0044; color: #fff; }
+        .scramble-btn.active-mission { background: #002200; border-color: #00ff44; color: #00ff44; animation: pg 1s infinite alternate; }
+        @keyframes pg { from { box-shadow: 0 0 4px rgba(0,255,68,0.3); } to { box-shadow: 0 0 12px rgba(0,255,68,0.8); } }
+        .abort-btn {
+            width: 100%; padding: 6px; background: #220000; border: 2px solid #ff4444;
+            color: #ff4444; font-family: 'Courier New', monospace; font-size: 11px;
+            border-radius: 4px; cursor: pointer; margin-top: 4px; transition: all 0.3s;
+        }
+        .abort-btn:hover { background: #ff4444; color: #fff; }
+        .legend { background: #050814; border: 2px solid #1a3a52; border-radius: 5px; padding: 12px; margin-top: 16px; }
+        .legend-title { color: #00ddff; margin-bottom: 7px; font-weight: bold; font-size: 12px; }
+        .legend-item { display: flex; align-items: center; margin-bottom: 5px; font-size: 10px; }
+        .legend-symbol { width: 24px; height: 12px; margin-right: 8px; border-radius: 2px; }
+        .shortcut-hint { background: #060e1a; border: 1px solid #ffcc00; border-radius: 4px; padding: 7px 10px; margin-top: 10px; font-size: 10px; color: #ffcc00; text-align: center; letter-spacing: 1px; }
+        .detected-tag { color: #ffff00; font-size: 9px; font-weight: bold; margin-left: 4px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="radar-container">
+        <div class="radar-title">EW THREAT DISPLAY — SU-30MKI</div>
+        <div class="pause-banner" id="pauseBanner">⏸ SIMULATION PAUSED — PRESS [SPACE] TO RESUME</div>
+        <canvas id="radarCanvas" width="700" height="700"></canvas>
+    </div>
+    <div class="controls">
+        <div class="controls-title">EMITTER PARAMETERS</div>
+        <div class="control-group">
+            <label>NUMBER OF THREATS (1–16)</label>
+            <input type="number" id="numThreats" min="1" max="16" value="1" step="1">
+        </div>
+        <div class="control-group">
+            <button id="clearButton" style="background:#8b0000;border-color:#ff4444;color:#ff8888;">CLEAR ALL THREATS</button>
+        </div>
+        <button class="pause-btn" id="pauseBtn">⏸ PAUSE SIMULATION [SPACE]</button>
+        <div class="info-display">
+            <div class="info-row"><span class="info-label">Active Threats:</span><span class="info-value" id="activeThreatsCount">1</span></div>
+            <div class="info-row"><span class="info-label">Detected by Sweep:</span><span class="info-value" id="detectedCount">0</span></div>
+            <div class="info-row"><span class="info-label">Enemy Aircraft:</span><span class="info-value" id="enemyStatusInfo">STANDBY</span></div>
+            <div class="info-row"><span class="info-label">Aircraft:</span><span class="info-value">Su-30MKI</span></div>
+            <div class="info-row"><span class="info-label">SIM STATUS:</span><span class="info-value" id="simStatus">RUNNING</span></div>
+        </div>
+        <div class="threats-section">
+            <div class="section-title">THREAT CONFIGURATIONS</div>
+            <div id="threatsContainer"></div>
+        </div>
+
+        <!-- SWEEP SECTION -->
+        <div class="sweep-section">
+            <div class="section-title">📡 RADAR SWEEP</div>
+            <div class="sweep-status-bar">
+                <span style="color:#00ff88;">STATUS:</span>
+                <span class="sweep-phase-value" id="sweepStatusDisplay">OFF</span>
+            </div>
+            <div class="sweep-panel">
+                <div class="control-group"><label>SWEEP SPEED (1–10)</label>
+                    <input type="number" id="sweepSpeed" min="1" max="10" value="3" step="1"></div>
+                <div class="control-group"><label>SWEEP WIDTH (°)</label>
+                    <input type="number" id="sweepWidth" min="5" max="40" value="15" step="5"></div>
+                <div class="control-group"><label>SWEEP RANGE (km)</label>
+                    <input type="number" id="sweepRange" min="50" max="200" value="200" step="10"></div>
+            </div>
+            <button class="sweep-btn" id="sweepToggleBtn">📡 ACTIVATE SWEEP</button>
+        </div>
+
+        <div class="enemy-section">
+            <div class="section-title">✈ ENEMY AIRCRAFT</div>
+            <div class="enemy-status-bar">
+                <span style="color:#ff6688;">MISSION PHASE:</span>
+                <span class="enemy-phase-value" id="enemyPhaseDisplay">STANDBY</span>
+            </div>
+            <div class="enemy-panel">
+                <div class="control-group"><label>ENTRY BEARING (°)</label><input type="number" id="enemyEntryAngle" min="-180" max="180" value="135" step="5"></div>
+                <div class="control-group"><label>DROP RANGE (km)</label><input type="number" id="enemyDropRange" min="20" max="150" value="60" step="10"></div>
+                <div class="row2">
+                    <div class="control-group"><label>INGRESS SPEED (1–10)</label><input type="number" id="enemyIngressSpeed" min="1" max="10" value="4" step="1"></div>
+                    <div class="control-group"><label>EGRESS SPEED (1–10)</label><input type="number" id="enemyEgressSpeed" min="1" max="10" value="7" step="1"></div>
+                </div>
+                <div class="control-group"><label>MISSILE SPEED (1–10)</label><input type="number" id="enemyMissileSpeed" min="1" max="10" value="6" step="1"></div>
+                <div class="control-group"><label>MISSILES TO DROP (1–4)</label><input type="number" id="enemyMissileCount" min="1" max="4" value="2" step="1"></div>
+            </div>
+            <button class="scramble-btn" id="scrambleBtn">⚠ SCRAMBLE ENEMY</button>
+            <button class="abort-btn" id="abortEnemyBtn">✕ ABORT MISSION</button>
+        </div>
+        <div class="shortcut-hint">⌨ [SPACE] — PAUSE / RESUME ALL MOTION</div>
+        <div class="legend">
+            <div class="legend-title">TRAJECTORY GUIDE</div>
+            <div class="legend-item"><div class="legend-symbol" style="background:rgba(0,255,136,0.2);border:1px solid #00ff88;"></div><span style="color:#00ff88;">Straight — direct A→B line</span></div>
+            <div class="legend-item"><div class="legend-symbol" style="background:rgba(68,170,255,0.2);border:1px solid #44aaff;"></div><span style="color:#44aaff;">S-Curve — S-shape between A→B</span></div>
+            <div class="legend-item"><div class="legend-symbol" style="background:rgba(255,136,0,0.2);border:1px solid #ff8800;"></div><span style="color:#ff8800;">Inbound Parabolic — arc toward centre</span></div>
+            <div class="legend-item"><div class="legend-symbol" style="background:rgba(255,68,255,0.2);border:1px solid #ff44ff;"></div><span style="color:#ff44ff;">Outbound Parabolic — arc away from centre</span></div>
+            <div style="margin-top:8px;font-size:10px;color:#888;line-height:1.7;">
+                <span style="color:#ffaa00;">●</span> Start point &nbsp; <span style="color:#ff4444;">■</span> End point<br>
+                Dashed ghost path shows full trajectory<br>
+                Shape rotates to face direction of travel<br>
+                □ Search | △ Track | ◇ TWS | ✱ Acq | ⊕ Missile | # Unknown<br>
+                <span style="color:#ffff00;">⚡ DETECTED</span> — swept by radar beam
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+// ═══════════════════════════════════════════════
+//  CONSTANTS & HELPERS
+// ═══════════════════════════════════════════════
+const canvas = document.getElementById('radarCanvas');
+const ctx    = canvas.getContext('2d');
+const CX = canvas.width  / 2;
+const CY = canvas.height / 2;
+const MAX_R  = 300;
+const MAX_KM = 200;
+const PX_PER_KM = MAX_R / MAX_KM;
+
+const deg2rad = d => d * Math.PI / 180;
+const kmToPx  = km => km * PX_PER_KM;
+
+function polarToXY(angleDeg, km) {
+    const a = deg2rad(angleDeg - 90);
+    const r = kmToPx(km);
+    return { x: CX + Math.cos(a)*r, y: CY + Math.sin(a)*r };
+}
+function hexRGB(hex) {
+    return { r:parseInt(hex.slice(1,3),16), g:parseInt(hex.slice(3,5),16), b:parseInt(hex.slice(5,7),16) };
+}
+
+const THREAT_COLORS = [
+    '#ff2200','#00ff44','#ffee00','#ff00cc','#00ddff','#ff8800',
+    '#0088ff','#aaff00','#ff0066','#8800ff','#ff9999','#99ffbb',
+    '#ffff99','#ff99ff','#99ffff','#ffffff'
+];
+
+const THREAT_TYPES = ['search','track','trackWhileScan','acquisition','missile','unknown'];
+const THREAT_LABELS = { search:'Search (□)', track:'Track (△)', trackWhileScan:'TWS (◇)', acquisition:'Acquisition (✱)', missile:'Missile (⊕)', unknown:'Unknown (#)' };
+const THREAT_SYMBOLS = { search:'□', track:'△', trackWhileScan:'◇', acquisition:'✱', missile:'⊕', unknown:'#' };
+
+// ═══════════════════════════════════════════════
+//  BEZIER HELPERS
+// ═══════════════════════════════════════════════
+function lerp(a, b, t) { return { x:a.x+(b.x-a.x)*t, y:a.y+(b.y-a.y)*t }; }
+function quadBezier(p0, p1, p2, t) {
+    const u=1-t;
+    return { x:u*u*p0.x+2*u*t*p1.x+t*t*p2.x, y:u*u*p0.y+2*u*t*p1.y+t*t*p2.y };
+}
+function cubicBezier(p0, p1, p2, p3, t) {
+    const u=1-t;
+    return {
+        x:u*u*u*p0.x+3*u*u*t*p1.x+3*u*t*t*p2.x+t*t*t*p3.x,
+        y:u*u*u*p0.y+3*u*u*t*p1.y+3*u*t*t*p2.y+t*t*t*p3.y
+    };
+}
+function perpUnit(a, b) {
+    const dx=b.x-a.x, dy=b.y-a.y, len=Math.sqrt(dx*dx+dy*dy)||1;
+    return { x:-dy/len, y:dx/len };
+}
+function segLen(a, b) { return Math.sqrt((b.x-a.x)**2+(b.y-a.y)**2); }
+
+// ═══════════════════════════════════════════════
+//  TRAJECTORY FUNCTIONS
+// ═══════════════════════════════════════════════
+function trajStraight(start, end, t) { return lerp(start, end, t); }
+function trajSCurve(start, end, t) {
+    const mid  = lerp(start, end, 0.5);
+    const p    = perpUnit(start, end);
+    const amp  = segLen(start, end) * 0.40;
+    const c1 = { x:start.x+(end.x-start.x)*0.2 + p.x*amp,  y:start.y+(end.y-start.y)*0.2 + p.y*amp  };
+    const c2 = { x:start.x+(end.x-start.x)*0.5 + p.x*amp*0.05, y:start.y+(end.y-start.y)*0.5 + p.y*amp*0.05 };
+    const c3 = { x:start.x+(end.x-start.x)*0.5 - p.x*amp*0.05, y:start.y+(end.y-start.y)*0.5 - p.y*amp*0.05 };
+    const c4 = { x:start.x+(end.x-start.x)*0.8 - p.x*amp,  y:start.y+(end.y-start.y)*0.8 - p.y*amp  };
+    if (t <= 0.5) return cubicBezier(start, c1, c2, mid, t*2);
+    else           return cubicBezier(mid,   c3, c4, end, (t-0.5)*2);
+}
+function trajInboundParabolic(start, end, t) {
+    const mid = lerp(start, end, 0.5);
+    const toCX = CX-mid.x, toCY = CY-mid.y;
+    const dist  = Math.sqrt(toCX**2+toCY**2)||1;
+    const amp   = segLen(start,end)*0.6;
+    const ctrl  = { x:mid.x+(toCX/dist)*amp, y:mid.y+(toCY/dist)*amp };
+    return quadBezier(start, ctrl, end, t);
+}
+function trajOutboundParabolic(start, end, t) {
+    const mid  = lerp(start, end, 0.5);
+    const awX  = mid.x-CX, awY = mid.y-CY;
+    const dist = Math.sqrt(awX**2+awY**2)||1;
+    const amp  = segLen(start,end)*0.6;
+    const ctrl = { x:mid.x+(awX/dist)*amp, y:mid.y+(awY/dist)*amp };
+    return quadBezier(start, ctrl, end, t);
+}
+function getPosition(th, t) {
+    const sp = polarToXY(th.startBearing, th.startRange);
+    const ep = polarToXY(th.endBearing,   th.endRange);
+    switch (th.trajectory) {
+        case 'scurve':             return trajSCurve(sp, ep, t);
+        case 'inbound_parabolic':  return trajInboundParabolic(sp, ep, t);
+        case 'outbound_parabolic': return trajOutboundParabolic(sp, ep, t);
+        default:                   return trajStraight(sp, ep, t);
+    }
+}
+function buildPath(th, steps=60) {
+    const pts=[];
+    for(let i=0;i<=steps;i++) pts.push(getPosition(th,i/steps));
+    return pts;
+}
+
+// ═══════════════════════════════════════════════
+//  DYNAMIC SCAN BOUNDS FROM TRAJECTORY
+//  Computes scanDirection, scanAngle, range to cover full path
+// ═══════════════════════════════════════════════
+function computeDynamicScanFromPath(th) {
+    const pts = buildPath(th, 80);
+    let minAngle = Infinity, maxAngle = -Infinity, maxRange = 0;
+    pts.forEach(p => {
+        const dx = p.x - CX, dy = p.y - CY;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        const angleDeg = (Math.atan2(dy, dx) * 180 / Math.PI + 90 + 360) % 360;
+        const normAngle = angleDeg > 180 ? angleDeg - 360 : angleDeg;
+        if (normAngle < minAngle) minAngle = normAngle;
+        if (normAngle > maxAngle) maxAngle = normAngle;
+        const km = dist / PX_PER_KM;
+        if (km > maxRange) maxRange = km;
+    });
+    const center = (minAngle + maxAngle) / 2;
+    const halfSpan = Math.min(180, (maxAngle - minAngle) / 2 + 8); // +8 padding
+    return {
+        scanDirection: center,
+        scanAngle: Math.max(5, halfSpan),
+        range: Math.min(200, maxRange + 10)
+    };
+}
+
+// ═══════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════
+let paused = false;
+let rs = {
+    numThreats:1, threats:[],
+    sweep:{
+        active:false, angle:0, speed:3, width:15, range:200,
+        detected:new Set()
+    },
+    enemy:{
+        active:false,phase:'standby',x:0,y:0,angle:0,
+        entryAngle:135,dropRange:60,ingressSpeed:4,egressSpeed:7,
+        missileSpeed:6,missileCount:2,progress:0,trail:[],missiles:[],flashTimer:0
+    }
+};
+
+const PRESETS = {
+    search        :{ angle:30,  range:80,  pages:2 },
+    track         :{ angle:20,  range:100, pages:1 },
+    trackWhileScan:{ angle:10,  range:80,  pages:1 },
+    acquisition   :{ angle:55,  range:80,  pages:2 },
+    missile       :{ angle:10,  range:50,  pages:1 },
+    unknown       :{ angle:180, range:50,  pages:1 }
+};
+
+// ═══════════════════════════════════════════════
+//  THREAT INIT
+// ═══════════════════════════════════════════════
+function initThreats() {
+    rs.threats=[];
+    for(let i=0;i<rs.numThreats;i++){
+        const type = 'search';
+        const p=PRESETS[type];
+        const dir=(360/rs.numThreats)*i;
+        rs.threats.push({
+            id:i+1, threatType: type,
+            scanDirection:dir, scanAngle:p.angle, range:p.range, numPages:p.pages,
+            color:THREAT_COLORS[i%THREAT_COLORS.length],
+            motionMode:'static', trajectory:'straight',
+            startBearing:dir,     startRange:150,
+            endBearing  :dir+40,  endRange  :40,
+            velocity    :0.004,
+            t:0, tDir:1, trail:[], _pos:null,
+            detected:false, detectedTimer:0
+        });
+    }
+}
+
+// ═══════════════════════════════════════════════
+//  BUILD UI
+// ═══════════════════════════════════════════════
+function createUI() {
+    const c=document.getElementById('threatsContainer');
+    c.innerHTML='';
+    rs.threats.forEach((th,i)=>{
+        const open=(i===0);
+        const div=document.createElement('div');
+        div.className='threat-item';
+        div.innerHTML=`
+<div class="threat-header" onclick="toggleT(${i})">
+    <div>
+        <span class="threat-color-indicator" style="background:${th.color};"></span>
+        <span class="threat-title" id="th-title-${i}">Threat ${th.id} — ${th.threatType.toUpperCase()} ${THREAT_SYMBOLS[th.threatType]}</span>
+    </div>
+    <span class="threat-toggle ${open?'open':''}">▼</span>
+</div>
+<div class="threat-content ${open?'open':''}" id="tc-${i}">
+
+    <!-- PER-THREAT TYPE SELECTOR -->
+    <div class="control-group">
+        <label>THREAT TYPE</label>
+        <select onchange="setThreatType(${i},this.value)">
+            ${THREAT_TYPES.map(t=>`<option value="${t}" ${th.threatType===t?'selected':''}>${THREAT_LABELS[t]}</option>`).join('')}
+        </select>
+    </div>
+
+    <div class="control-group"><label>SCAN DIRECTION (°)</label>
+        <input type="number" id="sd-${i}" min="-180" max="180" value="${th.scanDirection}" step="1"
+               onchange="setF(${i},'scanDirection',+this.value)"></div>
+    <div class="control-group"><label>SCAN ANGLE (±°)</label>
+        <input type="number" id="sa-${i}" min="0" max="180" value="${th.scanAngle}" step="1"
+               onchange="setF(${i},'scanAngle',+this.value)"></div>
+    <div class="control-group"><label>RANGE (km)</label>
+        <input type="number" id="rng-${i}" min="20" max="200" value="${th.range}" step="10"
+               onchange="setF(${i},'range',+this.value)"></div>
+    <div class="control-group"><label>NUMBER OF PAGES</label>
+        <input type="number" min="1" max="10" value="${th.numPages}" step="1"
+               onchange="setF(${i},'numPages',+this.value)"></div>
+
+    <div class="traj-panel">
+        <div class="traj-panel-title">⬡ MOTION CONFIGURATION</div>
+        <div class="control-group"><label>MOTION MODE</label>
+            <select onchange="setMode(${i},this.value)">
+                <option value="static"  ${th.motionMode==='static' ?'selected':''}>STATIC — fixed position</option>
+                <option value="dynamic" ${th.motionMode==='dynamic'?'selected':''}>DYNAMIC — moves along trajectory</option>
+            </select>
+            <span class="badge ${th.motionMode==='static'?'badge-static':'badge-dynamic'}" id="mb-${i}">
+                ${th.motionMode==='static'?'◉ STATIC':'▶ DYNAMIC'}
+            </span>
+        </div>
+        <div class="dynamic-opts ${th.motionMode==='dynamic'?'show':''}" id="do-${i}">
+            <div class="control-group"><label>TRAJECTORY TYPE</label>
+                <select onchange="setTraj(${i},this.value)">
+                    <option value="straight"           ${th.trajectory==='straight'?'selected':''}>Straight — direct line A→B</option>
+                    <option value="scurve"             ${th.trajectory==='scurve'?'selected':''}>S-Curve — S-shaped path A→B</option>
+                    <option value="inbound_parabolic"  ${th.trajectory==='inbound_parabolic'?'selected':''}>Inbound Parabolic — arc toward centre</option>
+                    <option value="outbound_parabolic" ${th.trajectory==='outbound_parabolic'?'selected':''}>Outbound Parabolic — arc away from centre</option>
+                </select>
+                <span class="badge badge-straight" id="tb-${i}">▶ STRAIGHT</span>
+            </div>
+            <div style="background:#0a1a0a;border:1px solid #00ff8855;border-radius:4px;padding:6px;margin-bottom:8px;font-size:9px;color:#00ff88;">
+                ℹ In DYNAMIC mode, sector auto-adapts to cover full trajectory path
+            </div>
+            <div class="traj-sub" style="color:#ffaa00;">● START POINT</div>
+            <div class="row2">
+                <div class="control-group"><label>BEARING (°)</label>
+                    <input type="number" min="-180" max="180" value="${th.startBearing}" step="5"
+                           onchange="setF(${i},'startBearing',+this.value);clearTrail(${i})"></div>
+                <div class="control-group"><label>RANGE (km)</label>
+                    <input type="number" min="5" max="200" value="${th.startRange}" step="5"
+                           onchange="setF(${i},'startRange',+this.value);clearTrail(${i})"></div>
+            </div>
+            <div class="traj-sub" style="color:#ff4444;">■ END POINT</div>
+            <div class="row2">
+                <div class="control-group"><label>BEARING (°)</label>
+                    <input type="number" min="-180" max="180" value="${th.endBearing}" step="5"
+                           onchange="setF(${i},'endBearing',+this.value);clearTrail(${i})"></div>
+                <div class="control-group"><label>RANGE (km)</label>
+                    <input type="number" min="5" max="200" value="${th.endRange}" step="5"
+                           onchange="setF(${i},'endRange',+this.value);clearTrail(${i})"></div>
+            </div>
+            <div class="traj-sub">⚡ VELOCITY</div>
+            <div class="control-group"><label>SPEED (1–20)</label>
+                <input type="number" min="1" max="20" value="${Math.round(th.velocity*1000)}" step="1"
+                       onchange="setF(${i},'velocity',this.value/1000)"></div>
+        </div>
+    </div>
+</div>`;
+        c.appendChild(div);
+    });
+}
+
+window.toggleT    = i=>{
+    const ct=document.getElementById(`tc-${i}`);
+    const tg=ct.previousElementSibling.querySelector('.threat-toggle');
+    ct.classList.toggle('open'); tg.classList.toggle('open');
+    ct.previousElementSibling.classList.toggle('active');
+};
+window.setF       = (i,f,v)=>{ rs.threats[i][f]=v; };
+window.clearTrail = i=>{ rs.threats[i].trail=[]; rs.threats[i].t=0; };
+window.setMode    = (i,m)=>{
+    const th=rs.threats[i]; th.motionMode=m; th.t=0; th.tDir=1; th.trail=[]; th._pos=null;
+    const mb=document.getElementById(`mb-${i}`);
+    mb.textContent=m==='static'?'◉ STATIC':'▶ DYNAMIC';
+    mb.className=`badge ${m==='static'?'badge-static':'badge-dynamic'}`;
+    const do_=document.getElementById(`do-${i}`);
+    m==='dynamic'?do_.classList.add('show'):do_.classList.remove('show');
+};
+window.setTraj    = (i,tj)=>{
+    rs.threats[i].trajectory=tj; rs.threats[i].trail=[]; rs.threats[i].t=0;
+    const map={
+        straight          :['▶ STRAIGHT',     'badge-straight'],
+        scurve            :['〜 S-CURVE',      'badge-scurve'  ],
+        inbound_parabolic :['⌒ INBOUND PARA', 'badge-inbound' ],
+        outbound_parabolic:['⌣ OUTBOUND PARA','badge-outbound'],
+    };
+    const b=document.getElementById(`tb-${i}`);
+    b.textContent=map[tj][0]; b.className=`badge ${map[tj][1]}`;
+};
+window.setThreatType = (i, type) => {
+    const th = rs.threats[i];
+    th.threatType = type;
+    const p = PRESETS[type];
+    // Update scan defaults if static
+    if(th.motionMode === 'static') {
+        th.scanAngle = p.angle;
+        th.range = p.range;
+        th.numPages = p.pages;
+    }
+    // Update title
+    document.getElementById(`th-title-${i}`).textContent = `Threat ${th.id} — ${type.toUpperCase()} ${THREAT_SYMBOLS[type]}`;
+};
+
+// ═══════════════════════════════════════════════
+//  PAUSE
+// ═══════════════════════════════════════════════
+function togglePause() {
+    paused = !paused;
+    const btn = document.getElementById('pauseBtn');
+    const banner = document.getElementById('pauseBanner');
+    const sim = document.getElementById('simStatus');
+    if(paused) {
+        btn.textContent = '▶ RESUME SIMULATION [SPACE]';
+        btn.classList.add('paused');
+        banner.classList.add('visible');
+        sim.textContent = 'PAUSED';
+        sim.style.color = '#ffcc00';
+    } else {
+        btn.textContent = '⏸ PAUSE SIMULATION [SPACE]';
+        btn.classList.remove('paused');
+        banner.classList.remove('visible');
+        sim.textContent = 'RUNNING';
+        sim.style.color = '#00ff00';
+    }
+}
+document.addEventListener('keydown', e => {
+    if(e.code === 'Space' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') {
+        e.preventDefault();
+        togglePause();
+    }
+});
+document.getElementById('pauseBtn').addEventListener('click', togglePause);
+
+// ═══════════════════════════════════════════════
+//  UPDATE DYNAMIC THREATS
+// ═══════════════════════════════════════════════
+function updateDynamic() {
+    if(paused) return;
+    rs.threats.forEach(th=>{
+        if(th.motionMode!=='dynamic') return;
+        th.t+=th.velocity*th.tDir;
+        if(th.t>=1){th.t=1;th.tDir=-1;}
+        if(th.t<=0){th.t=0;th.tDir=1;}
+        th._pos=getPosition(th,th.t);
+        th.trail.push({x:th._pos.x,y:th._pos.y});
+        if(th.trail.length>70)th.trail.shift();
+    });
+    // Cool down detected flag
+    rs.threats.forEach(th => {
+        if(th.detectedTimer > 0) th.detectedTimer--;
+        if(th.detectedTimer <= 0) th.detected = false;
+    });
+}
+
+// ═══════════════════════════════════════════════
+//  SWEEP DETECTION
+// ═══════════════════════════════════════════════
+function updateSweep() {
+    if(!rs.sweep.active || paused) return;
+    const sw = rs.sweep;
+    const speedDeg = sw.speed * 0.6;
+    sw.angle = (sw.angle + speedDeg) % 360;
+
+    // Check all threats for intersection with sweep beam
+    const sweepRad = sw.angle;
+    const halfW = sw.width / 2;
+
+    rs.threats.forEach(th => {
+        let tx, ty;
+        if(th.motionMode === 'dynamic' && th._pos) {
+            tx = th._pos.x; ty = th._pos.y;
+        } else {
+            const pos = polarToXY(th.scanDirection, th.range);
+            tx = pos.x; ty = pos.y;
+        }
+        const dx = tx - CX, dy = ty - CY;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        const km = dist / PX_PER_KM;
+        if(km > sw.range) return;
+
+        // Angle of threat from center (0=north, clockwise)
+        let tAngle = (Math.atan2(dy, dx) * 180 / Math.PI + 90 + 360) % 360;
+        // Angular diff from sweep angle
+        let diff = ((tAngle - sweepRad + 540) % 360) - 180;
+        if(Math.abs(diff) < halfW) {
+            th.detected = true;
+            th.detectedTimer = 80;
+        }
+    });
+}
+
+// ═══════════════════════════════════════════════
+//  DRAW SWEEP
+// ═══════════════════════════════════════════════
+function drawSweep() {
+    const sw = rs.sweep;
+    if(!sw.active) return;
+    const sweepR = kmToPx(sw.range);
+    const baseAngle = deg2rad(sw.angle - 90);
+    const halfW = deg2rad(sw.width / 2);
+
+    // Sweep wedge gradient
+    const grad = ctx.createConicalGradient ? null : null;
+    // Use arc fill for sweep wedge
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(CX, CY);
+    ctx.arc(CX, CY, sweepR, baseAngle - halfW, baseAngle);
+    ctx.closePath();
+
+    const grd = ctx.createLinearGradient(CX, CY,
+        CX + Math.cos(baseAngle) * sweepR,
+        CY + Math.sin(baseAngle) * sweepR);
+    grd.addColorStop(0, 'rgba(0,255,136,0.02)');
+    grd.addColorStop(0.7, 'rgba(0,255,136,0.15)');
+    grd.addColorStop(1, 'rgba(0,255,136,0.35)');
+    ctx.fillStyle = grd;
+    ctx.fill();
+
+    // Leading edge bright line
+    ctx.beginPath();
+    ctx.moveTo(CX, CY);
+    ctx.lineTo(CX + Math.cos(baseAngle)*sweepR, CY + Math.sin(baseAngle)*sweepR);
+    ctx.strokeStyle = 'rgba(0,255,136,0.85)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Trailing fade wedge
+    ctx.beginPath();
+    ctx.moveTo(CX, CY);
+    ctx.arc(CX, CY, sweepR, baseAngle - halfW * 3, baseAngle - halfW);
+    ctx.closePath();
+    const grd2 = ctx.createLinearGradient(CX, CY,
+        CX + Math.cos(baseAngle - halfW*2)*sweepR,
+        CY + Math.sin(baseAngle - halfW*2)*sweepR);
+    grd2.addColorStop(0, 'rgba(0,255,136,0)');
+    grd2.addColorStop(1, 'rgba(0,255,136,0.07)');
+    ctx.fillStyle = grd2;
+    ctx.fill();
+
+    // Sweep range ring
+    ctx.beginPath();
+    ctx.arc(CX, CY, sweepR, 0, Math.PI*2);
+    ctx.strokeStyle = 'rgba(0,255,136,0.18)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4,6]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+}
+
+// ═══════════════════════════════════════════════
+//  DRAW GHOST PATH
+// ═══════════════════════════════════════════════
+function drawGhost(th) {
+    if(th.motionMode!=='dynamic') return;
+    const pts=buildPath(th,80);
+    const {r,g,b}=hexRGB(th.color);
+    ctx.save();
+    ctx.setLineDash([3,6]);
+    ctx.strokeStyle=`rgba(${r},${g},${b},0.22)`;
+    ctx.lineWidth=1;
+    ctx.beginPath();
+    pts.forEach((p,i)=>i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y));
+    ctx.stroke();
+    ctx.setLineDash([]);
+    const prog=getPosition(th,th.t);
+    ctx.strokeStyle=`rgba(${r},${g},${b},0.5)`;
+    ctx.lineWidth=0.5;
+    ctx.beginPath(); ctx.arc(prog.x,prog.y,14,0,Math.PI*2); ctx.stroke();
+    const sp=polarToXY(th.startBearing,th.startRange);
+    ctx.fillStyle='rgba(255,170,0,0.9)';
+    ctx.beginPath(); ctx.arc(sp.x,sp.y,4,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='#ffaa00'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.arc(sp.x,sp.y,8,0,Math.PI*2); ctx.stroke();
+    ctx.fillStyle='#ffaa00'; ctx.font='bold 9px Courier New';
+    ctx.fillText('S',sp.x-3,sp.y+3);
+    const ep=polarToXY(th.endBearing,th.endRange);
+    ctx.fillStyle='rgba(255,50,50,0.9)';
+    ctx.fillRect(ep.x-4,ep.y-4,8,8);
+    ctx.strokeStyle='#ff4444'; ctx.lineWidth=1.5;
+    ctx.strokeRect(ep.x-7,ep.y-7,14,14);
+    ctx.fillStyle='#ff4444'; ctx.font='bold 9px Courier New';
+    ctx.fillText('E',ep.x-3,ep.y+3);
+    ctx.restore();
+}
+
+// ═══════════════════════════════════════════════
+//  DRAW TRAIL
+// ═══════════════════════════════════════════════
+function drawTrail(th) {
+    if(th.motionMode!=='dynamic'||th.trail.length<2) return;
+    const {r,g,b}=hexRGB(th.color);
+    for(let j=1;j<th.trail.length;j++){
+        const a=(j/th.trail.length)*0.65;
+        ctx.strokeStyle=`rgba(${r},${g},${b},${a})`;
+        ctx.lineWidth=1.5;
+        ctx.beginPath();
+        ctx.moveTo(th.trail[j-1].x,th.trail[j-1].y);
+        ctx.lineTo(th.trail[j  ].x,th.trail[j  ].y);
+        ctx.stroke();
+    }
+}
+
+// ═══════════════════════════════════════════════
+//  DRAW SECTOR  (dynamic mode → auto-computed bounds)
+// ═══════════════════════════════════════════════
+function drawSector(th) {
+    let scanDir, scanAng, range;
+    if(th.motionMode === 'dynamic') {
+        const bounds = computeDynamicScanFromPath(th);
+        scanDir = bounds.scanDirection;
+        scanAng = bounds.scanAngle;
+        range   = bounds.range;
+    } else {
+        scanDir = th.scanDirection;
+        scanAng = th.scanAngle;
+        range   = th.range;
+    }
+
+    const selR=kmToPx(range);
+    const sA=deg2rad(scanDir-scanAng-90);
+    const eA=deg2rad(scanDir+scanAng-90);
+    const {r,g,b}=hexRGB(th.color);
+    ctx.fillStyle=`rgba(${r},${g},${b},0.06)`;
+    ctx.strokeStyle=th.color; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(CX,CY); ctx.arc(CX,CY,selR,sA,eA);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.setLineDash([5,5]); ctx.beginPath(); ctx.arc(CX,CY,selR,sA,eA); ctx.stroke(); ctx.setLineDash([]);
+    if(th.numPages>1){
+        ctx.strokeStyle=`rgba(${r},${g},${b},0.25)`; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+        for(let p=1;p<th.numPages;p++){
+            ctx.beginPath(); ctx.arc(CX,CY,selR*(p/th.numPages),sA,eA); ctx.stroke();
+        }
+        ctx.setLineDash([]);
+    }
+    ctx.strokeStyle=th.color; ctx.lineWidth=1.5;
+    [scanDir-scanAng, scanDir+scanAng].forEach(a=>{
+        const rad=deg2rad(a-90);
+        ctx.beginPath(); ctx.moveTo(CX,CY);
+        ctx.lineTo(CX+Math.cos(rad)*selR,CY+Math.sin(rad)*selR); ctx.stroke();
+    });
+    const ca=deg2rad(scanDir-90);
+    ctx.setLineDash([8,4]); ctx.beginPath(); ctx.moveTo(CX,CY);
+    ctx.lineTo(CX+Math.cos(ca)*selR*0.7,CY+Math.sin(ca)*selR*0.7); ctx.stroke();
+    ctx.setLineDash([]);
+}
+
+// ═══════════════════════════════════════════════
+//  DRAW THREAT SYMBOL
+// ═══════════════════════════════════════════════
+function drawSymbol(th) {
+    let sx, sy, rotation=0;
+    if(th.motionMode==='dynamic' && th._pos){
+        sx=th._pos.x; sy=th._pos.y;
+        if(th.trail.length>=3){
+            const prev=th.trail[Math.max(0,th.trail.length-5)];
+            const curr=th.trail[th.trail.length-1];
+            const dx=curr.x-prev.x, dy=curr.y-prev.y;
+            if(Math.abs(dx)+Math.abs(dy)>0.2) rotation=Math.atan2(dy,dx)+Math.PI/2;
+        }
+    } else {
+        const pos=polarToXY(th.scanDirection,th.range);
+        sx=pos.x; sy=pos.y;
+    }
+
+    const {r,g,b}=hexRGB(th.color);
+    const type = th.threatType || 'search';
+
+    ctx.save();
+    ctx.translate(sx,sy);
+    if(rotation!==0) ctx.rotate(rotation);
+
+    // Detection pulse glow
+    if(th.detected && th.detectedTimer > 0) {
+        const pulse = Math.sin(Date.now() * 0.05) * 0.5 + 0.5;
+        const detGrd = ctx.createRadialGradient(0,0,0,0,0,32);
+        detGrd.addColorStop(0, `rgba(255,255,0,${0.6*pulse})`);
+        detGrd.addColorStop(1, 'rgba(255,255,0,0)');
+        ctx.fillStyle = detGrd; ctx.beginPath(); ctx.arc(0,0,32,0,Math.PI*2); ctx.fill();
+        ctx.strokeStyle = `rgba(255,255,0,${0.8*pulse})`;
+        ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0,0,22,0,Math.PI*2); ctx.stroke();
+    }
+
+    // Glow halo
+    const grd=ctx.createRadialGradient(0,0,0,0,0,22);
+    grd.addColorStop(0,`rgba(${r},${g},${b},0.55)`);
+    grd.addColorStop(1,`rgba(${r},${g},${b},0)`);
+    ctx.fillStyle=grd; ctx.beginPath(); ctx.arc(0,0,22,0,Math.PI*2); ctx.fill();
+
+    ctx.fillStyle=th.color; ctx.strokeStyle='#ffffff'; ctx.lineWidth=1.8;
+
+    switch(type){
+        case 'search':
+            ctx.fillRect(-9,-9,18,18); ctx.strokeRect(-9,-9,18,18);
+            break;
+        case 'track':
+            ctx.beginPath(); ctx.moveTo(0,-12); ctx.lineTo(-9,9); ctx.lineTo(9,9);
+            ctx.closePath(); ctx.fill(); ctx.stroke();
+            break;
+        case 'trackWhileScan':
+            ctx.beginPath(); ctx.moveTo(0,-12); ctx.lineTo(12,0); ctx.lineTo(0,12); ctx.lineTo(-12,0);
+            ctx.closePath(); ctx.fill(); ctx.stroke();
+            break;
+        case 'acquisition':
+            for(let a=0;a<8;a++){
+                const rad=deg2rad(a*45);
+                ctx.strokeStyle=th.color; ctx.lineWidth=2.5;
+                ctx.beginPath(); ctx.moveTo(Math.cos(rad)*4,Math.sin(rad)*4);
+                ctx.lineTo(Math.cos(rad)*13,Math.sin(rad)*13); ctx.stroke();
+            }
+            ctx.fillStyle=th.color; ctx.strokeStyle='#fff'; ctx.lineWidth=1.5;
+            ctx.beginPath(); ctx.arc(0,0,5,0,Math.PI*2); ctx.fill(); ctx.stroke();
+            break;
+        case 'missile':
+            ctx.strokeStyle='#fff'; ctx.lineWidth=1.5;
+            ctx.beginPath(); ctx.moveTo(0,-14); ctx.lineTo(4,-4); ctx.lineTo(-4,-4); ctx.closePath();
+            ctx.fill(); ctx.stroke();
+            ctx.fillRect(-4,-4,8,14);
+            ctx.strokeRect(-4,-4,8,14);
+            ctx.beginPath(); ctx.moveTo(-4,5); ctx.lineTo(-10,14); ctx.lineTo(-4,10); ctx.closePath(); ctx.fill(); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(4,5);  ctx.lineTo(10,14);  ctx.lineTo(4,10);  ctx.closePath(); ctx.fill(); ctx.stroke();
+            ctx.fillStyle='#ffff00';
+            ctx.beginPath(); ctx.arc(0,11,3,0,Math.PI*2); ctx.fill();
+            break;
+        case 'unknown':
+            ctx.beginPath();
+            for(let a=0;a<6;a++){
+                const rad=deg2rad(a*60-30);
+                a===0?ctx.moveTo(Math.cos(rad)*11,Math.sin(rad)*11)
+                     :ctx.lineTo(Math.cos(rad)*11,Math.sin(rad)*11);
+            }
+            ctx.closePath(); ctx.fill(); ctx.stroke();
+            ctx.fillStyle='#fff'; ctx.font='bold 10px Courier New';
+            ctx.textAlign='center'; ctx.textBaseline='middle';
+            ctx.fillText('?',0,1);
+            break;
+    }
+    ctx.restore();
+
+    // Label
+    ctx.save();
+    ctx.fillStyle='#fff'; ctx.font='bold 10px Courier New';
+    ctx.fillText('T'+th.id, sx+16, sy-6);
+    if(th.detected && th.detectedTimer > 0) {
+        ctx.fillStyle='#ffff00'; ctx.font='bold 9px Courier New';
+        ctx.fillText('⚡DET', sx+16, sy+4);
+    } else if(th.motionMode==='dynamic'){
+        const sn={straight:'STR',scurve:'S〜S',inbound_parabolic:'I⌒P',outbound_parabolic:'O⌣P'};
+        ctx.fillStyle='#00ffaa'; ctx.font='8px Courier New';
+        ctx.fillText(sn[th.trajectory]||'DYN', sx+16, sy+4);
+        const {r,g,b}=hexRGB(th.color);
+        const barW=22;
+        ctx.fillStyle=`rgba(${r},${g},${b},0.7)`;
+        ctx.fillRect(sx+16, sy+7, th.t*barW, 2);
+        ctx.strokeStyle='#333'; ctx.lineWidth=0.5;
+        ctx.strokeRect(sx+16, sy+7, barW, 2);
+    }
+    ctx.restore();
+}
+
+// ═══════════════════════════════════════════════
+//  FRIENDLY AIRCRAFT
+// ═══════════════════════════════════════════════
+function drawAircraft() {
+    ctx.save(); ctx.translate(CX,CY);
+    ctx.fillStyle='#00ddff'; ctx.strokeStyle='#00ffff'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(0,-22); ctx.lineTo(-3,12); ctx.lineTo(3,12);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-18,0); ctx.lineTo(18,0); ctx.lineTo(14,7); ctx.lineTo(-14,7);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    [[-7,9,-10,18,-4,18],[7,9,10,18,4,18]].forEach(([x1,y1,x2,y2,x3,y3])=>{
+        ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.lineTo(x3,y3);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+    });
+    ctx.fillStyle='#ff0000'; ctx.beginPath(); ctx.arc(0,0,3,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#00ddff'; ctx.font='bold 10px Courier New';
+    ctx.fillText('LHPD',-55,4); ctx.fillText('RHPD',30,4);
+    ctx.restore();
+}
+
+// ═══════════════════════════════════════════════
+//  ENEMY AIRCRAFT
+// ═══════════════════════════════════════════════
+function scrambleEnemy(){
+    const e=rs.enemy;
+    if(e.active&&e.phase!=='standby'&&e.phase!=='done') return;
+    e.entryAngle  =+document.getElementById('enemyEntryAngle').value;
+    e.dropRange   =+document.getElementById('enemyDropRange').value;
+    e.ingressSpeed=+document.getElementById('enemyIngressSpeed').value;
+    e.egressSpeed =+document.getElementById('enemyEgressSpeed').value;
+    e.missileSpeed=+document.getElementById('enemyMissileSpeed').value;
+    e.missileCount=+document.getElementById('enemyMissileCount').value;
+    e.active=true;e.phase='ingress';e.progress=0;e.trail=[];e.missiles=[];e.flashTimer=0;
+    const sp=polarToXY(e.entryAngle,MAX_KM+15);
+    e.x=sp.x;e.y=sp.y;e.angle=e.entryAngle+180;
+    document.getElementById('scrambleBtn').classList.add('active-mission');
+    document.getElementById('scrambleBtn').textContent='⚡ MISSION ACTIVE';
+    updateDisplay();
+}
+function abortEnemy(){
+    const e=rs.enemy;
+    e.active=false;e.phase='standby';e.progress=0;e.trail=[];e.missiles=[];
+    resetScrambleBtn();updateDisplay();
+}
+function resetScrambleBtn(){
+    const b=document.getElementById('scrambleBtn');
+    b.classList.remove('active-mission');b.textContent='⚠ SCRAMBLE ENEMY';b.disabled=false;
+}
+function updateEnemy(){
+    const e=rs.enemy;
+    if(!e.active||e.phase==='standby'||e.phase==='done') return;
+    if(paused) return;
+    const SK=MAX_KM+15;
+    if(e.phase==='ingress'){
+        e.progress=Math.min(1,e.progress+e.ingressSpeed*0.002);
+        const p=polarToXY(e.entryAngle,SK+(e.dropRange-SK)*e.progress);
+        e.x=p.x;e.y=p.y;e.angle=e.entryAngle+180;
+        e.trail.push({x:e.x,y:e.y});if(e.trail.length>60)e.trail.shift();
+        if(e.progress>=1){e.phase='drop';e.progress=0;spawnMissiles();}
+    }else if(e.phase==='drop'){
+        e.progress+=0.015;e.flashTimer++;
+        if(e.progress>=1){e.phase='egress';e.progress=0;e.angle=e.entryAngle;}
+    }else if(e.phase==='egress'){
+        e.progress=Math.min(1,e.progress+e.egressSpeed*0.002);
+        const p=polarToXY(e.entryAngle,e.dropRange+(SK-e.dropRange)*e.progress);
+        e.x=p.x;e.y=p.y;e.angle=e.entryAngle;
+        e.trail.push({x:e.x,y:e.y});if(e.trail.length>60)e.trail.shift();
+        if(e.progress>=1){
+            e.phase='done';e.active=false;e.trail=[];
+            setTimeout(()=>{resetScrambleBtn();updateDisplay();},1500);
+        }
+    }
+    e.missiles.forEach(m=>{
+        if(m.done)return;
+        m.progress=Math.min(1,m.progress+e.missileSpeed*0.003);
+        m.cx=m.sx+(m.tx-m.sx)*m.progress;m.cy=m.sy+(m.ty-m.sy)*m.progress;
+        m.trail.push({x:m.cx,y:m.cy});if(m.trail.length>35)m.trail.shift();
+        if(m.progress>=1){m.done=true;m.flash=15;}
+    });
+    updateDisplay();
+}
+function spawnMissiles(){
+    const e=rs.enemy;const sp=[-20,0,20,-10];
+    for(let i=0;i<e.missileCount;i++){
+        const tp=polarToXY(sp[i%4],5);
+        e.missiles.push({sx:e.x,sy:e.y,tx:tp.x,ty:tp.y,cx:e.x,cy:e.y,progress:0,trail:[],done:false,flash:0,id:i+1});
+    }
+}
+function drawEnemy(){
+    const e=rs.enemy;
+    if(!e.active&&e.phase==='standby')return;
+    if(e.phase==='done')return;
+    if(e.trail.length>1){
+        for(let j=1;j<e.trail.length;j++){
+            ctx.strokeStyle=`rgba(255,0,68,${(j/e.trail.length)*0.5})`;ctx.lineWidth=1.5;
+            ctx.beginPath();ctx.moveTo(e.trail[j-1].x,e.trail[j-1].y);ctx.lineTo(e.trail[j].x,e.trail[j].y);ctx.stroke();
+        }
+    }
+    e.missiles.forEach(drawMissile);
+    if(e.x<-50||e.x>canvas.width+50||e.y<-50||e.y>canvas.height+50)return;
+    ctx.save();ctx.translate(e.x,e.y);ctx.rotate(deg2rad(e.angle-90)+Math.PI/2);
+    const isD=e.phase==='drop',bl=isD?(e.flashTimer%8<4):true;
+    if(bl){
+        const g=ctx.createRadialGradient(0,0,0,0,0,20);
+        g.addColorStop(0,'rgba(255,0,68,0.4)');g.addColorStop(1,'rgba(255,0,68,0)');
+        ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,20,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle='#ff0044';ctx.strokeStyle='#ff3366';ctx.lineWidth=1.5;
+        ctx.beginPath();ctx.moveTo(0,-22);ctx.lineTo(-3,12);ctx.lineTo(3,12);ctx.closePath();ctx.fill();ctx.stroke();
+        ctx.beginPath();ctx.moveTo(-20,2);ctx.lineTo(20,2);ctx.lineTo(15,10);ctx.lineTo(-15,10);ctx.closePath();ctx.fill();ctx.stroke();
+        [[-7,9,-11,18,-4,18],[7,9,11,18,4,18]].forEach(([x1,y1,x2,y2,x3,y3])=>{
+            ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.lineTo(x3,y3);ctx.closePath();ctx.fill();ctx.stroke();
+        });
+        ctx.fillStyle='#ffff00';ctx.beginPath();ctx.arc(0,0,3,0,Math.PI*2);ctx.fill();
+    }
+    ctx.restore();
+    ctx.save();
+    ctx.fillStyle='#ff3366';ctx.font='bold 11px Courier New';ctx.fillText('BOGEY',e.x+14,e.y-14);
+    const pc={ingress:'#ff8888',drop:'#ffff00',egress:'#88ff88'};
+    ctx.fillStyle=pc[e.phase]||'#ff3366';ctx.font='9px Courier New';ctx.fillText(e.phase.toUpperCase(),e.x+14,e.y-4);
+    ctx.restore();
+    if(isD&&e.flashTimer%8<4){
+        ctx.strokeStyle='rgba(255,255,0,0.6)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(e.x,e.y,22,0,Math.PI*2);ctx.stroke();
+        ctx.strokeStyle='rgba(255,0,68,0.4)';ctx.lineWidth=1;ctx.beginPath();ctx.arc(e.x,e.y,32,0,Math.PI*2);ctx.stroke();
+    }
+}
+function drawMissile(m){
+    if(m.trail.length>1){
+        for(let j=1;j<m.trail.length;j++){
+            ctx.strokeStyle=`rgba(255,80,0,${(j/m.trail.length)*0.8})`;ctx.lineWidth=1.5;
+            ctx.beginPath();ctx.moveTo(m.trail[j-1].x,m.trail[j-1].y);ctx.lineTo(m.trail[j].x,m.trail[j].y);ctx.stroke();
+        }
+    }
+    if(m.done){
+        if(m.flash>0){
+            m.flash--;
+            const r=(15-m.flash)*4,a=m.flash/15;
+            const g=ctx.createRadialGradient(m.tx,m.ty,0,m.tx,m.ty,r);
+            g.addColorStop(0,`rgba(255,200,0,${a})`);g.addColorStop(0.5,`rgba(255,80,0,${a*0.6})`);g.addColorStop(1,`rgba(255,0,0,0)`);
+            ctx.fillStyle=g;ctx.beginPath();ctx.arc(m.tx,m.ty,r,0,Math.PI*2);ctx.fill();
+        }
+        return;
+    }
+    const g=ctx.createRadialGradient(m.cx,m.cy,0,m.cx,m.cy,10);
+    g.addColorStop(0,'rgba(255,80,0,1)');g.addColorStop(1,'rgba(255,80,0,0)');
+    ctx.fillStyle=g;ctx.beginPath();ctx.arc(m.cx,m.cy,10,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#ff5000';ctx.beginPath();ctx.arc(m.cx,m.cy,3.5,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#ff8844';ctx.font='bold 10px Courier New';ctx.fillText(`EM${m.id}`,m.cx+7,m.cy-5);
+}
+function drawEnemyAlert(){
+    const e=rs.enemy;
+    const am=e.missiles.filter(m=>!m.done&&m.progress>0.1);
+    if(!am.length)return;
+    if(Math.floor(Date.now()/400)%2===0){
+        ctx.save();ctx.fillStyle='rgba(255,0,68,0.9)';ctx.font='bold 14px Courier New';
+        ctx.fillText('⚠ MISSILE INBOUND',CX+60,30);ctx.restore();
+    }
+    am.forEach(m=>{
+        ctx.strokeStyle='rgba(255,80,0,0.2)';ctx.lineWidth=1;ctx.setLineDash([3,6]);
+        ctx.beginPath();ctx.moveTo(m.cx,m.cy);ctx.lineTo(m.tx,m.ty);ctx.stroke();ctx.setLineDash([]);
+    });
+}
+
+// ═══════════════════════════════════════════════
+//  MAIN DRAW LOOP
+// ═══════════════════════════════════════════════
+function drawRadar(){
+    ctx.fillStyle='#050814';ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    ctx.fillStyle='rgba(0,255,0,0.07)';ctx.beginPath();ctx.moveTo(CX,CY);
+    ctx.arc(CX,CY,MAX_R,deg2rad(45-90),deg2rad(225-90));ctx.closePath();ctx.fill();
+    ctx.fillStyle='rgba(100,200,255,0.07)';ctx.beginPath();ctx.moveTo(CX,CY);
+    ctx.arc(CX,CY,MAX_R,deg2rad(225-90),deg2rad(405-90));ctx.closePath();ctx.fill();
+
+    ctx.strokeStyle='rgba(150,150,150,0.25)';ctx.lineWidth=1.5;ctx.setLineDash([5,5]);
+    [[45],[225]].forEach(([a])=>{
+        const r=deg2rad(a-90);ctx.beginPath();ctx.moveTo(CX,CY);
+        ctx.lineTo(CX+Math.cos(r)*MAX_R,CY+Math.sin(r)*MAX_R);ctx.stroke();
+    });
+    ctx.setLineDash([]);
+
+    for(let i=1;i<=10;i++){
+        const r=kmToPx(i*20);ctx.strokeStyle='#1a3a52';ctx.lineWidth=1;
+        ctx.beginPath();ctx.arc(CX,CY,r,0,Math.PI*2);ctx.stroke();
+        ctx.fillStyle='#4a6a82';ctx.font='11px Courier New';ctx.fillText(i*20+'km',CX+5,CY-r+5);
+    }
+
+    const dirs=[[0,'0°',0,-18],[45,'45°',5,-10],[90,'90°',10,5],[135,'135°',5,15],
+        [180,'±180°',-22,20],[-135,'-135°',-42,15],[-90,'-90°',-42,5],[-45,'-45°',-42,-10]];
+    ctx.strokeStyle='#1a3a52';ctx.lineWidth=1;ctx.fillStyle='#00ddff';ctx.font='bold 13px Courier New';
+    dirs.forEach(([deg,label,dx,dy])=>{
+        const a=deg2rad(deg-90);
+        ctx.beginPath();ctx.moveTo(CX,CY);ctx.lineTo(CX+Math.cos(a)*MAX_R,CY+Math.sin(a)*MAX_R);ctx.stroke();
+        ctx.fillText(label,CX+Math.cos(a)*(MAX_R+10)+dx,CY+Math.sin(a)*(MAX_R+10)+dy);
+    });
+
+    // Update and draw sweep
+    updateSweep();
+    drawSweep();
+
+    // Update then draw
+    updateDynamic();
+    rs.threats.forEach(drawGhost);
+    rs.threats.forEach(drawTrail);
+    rs.threats.forEach(drawSector);
+
+    updateEnemy();
+    drawEnemy();
+    drawEnemyAlert();
+
+    drawAircraft();
+    rs.threats.forEach(drawSymbol);
+
+    // Paused overlay
+    if(paused) {
+        ctx.save();
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.strokeStyle = 'rgba(255,200,0,0.5)';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([10,10]);
+        ctx.strokeRect(3,3,canvas.width-6,canvas.height-6);
+        ctx.setLineDash([]);
+        ctx.restore();
+    }
+}
+
+// ═══════════════════════════════════════════════
+//  DISPLAY UPDATE
+// ═══════════════════════════════════════════════
+function updateDisplay(){
+    const ph={standby:'STANDBY',ingress:'INGRESS ►',drop:'DROP ⚠',egress:'EGRESS ◄',done:'RTB'};
+    document.getElementById('activeThreatsCount').textContent=rs.numThreats;
+    document.getElementById('enemyStatusInfo').textContent   =ph[rs.enemy.phase]||'STANDBY';
+    document.getElementById('enemyPhaseDisplay').textContent =ph[rs.enemy.phase]||'STANDBY';
+    const det = rs.threats.filter(t=>t.detected).length;
+    document.getElementById('detectedCount').textContent = det;
+    document.getElementById('sweepStatusDisplay').textContent = rs.sweep.active ? 'ACTIVE ●' : 'OFF';
+}
+
+// ═══════════════════════════════════════════════
+//  SWEEP CONTROLS
+// ═══════════════════════════════════════════════
+document.getElementById('sweepToggleBtn').addEventListener('click', () => {
+    rs.sweep.active = !rs.sweep.active;
+    rs.sweep.speed = +document.getElementById('sweepSpeed').value;
+    rs.sweep.width = +document.getElementById('sweepWidth').value;
+    rs.sweep.range = +document.getElementById('sweepRange').value;
+    const btn = document.getElementById('sweepToggleBtn');
+    if(rs.sweep.active) {
+        btn.textContent = '📡 DEACTIVATE SWEEP';
+        btn.classList.add('active');
+    } else {
+        btn.textContent = '📡 ACTIVATE SWEEP';
+        btn.classList.remove('active');
+        rs.threats.forEach(t => { t.detected = false; t.detectedTimer = 0; });
+    }
+    updateDisplay();
+});
+
+// ═══════════════════════════════════════════════
+//  EVENTS
+// ═══════════════════════════════════════════════
+document.getElementById('numThreats').addEventListener('input',function(){
+    rs.numThreats=Math.max(1,Math.min(16,+this.value));this.value=rs.numThreats;
+    initThreats();createUI();updateDisplay();
+});
+document.getElementById('clearButton').addEventListener('click',function(){
+    rs.numThreats=1;
+    document.getElementById('numThreats').value=1;
+    initThreats();createUI();updateDisplay();
+});
+document.getElementById('scrambleBtn').addEventListener('click',scrambleEnemy);
+document.getElementById('abortEnemyBtn').addEventListener('click',abortEnemy);
+
+// ═══════════════════════════════════════════════
+//  BOOT
+// ═══════════════════════════════════════════════
+initThreats();createUI();updateDisplay();
+function animate(){
+    drawRadar();
+    updateDisplay();
+    requestAnimationFrame(animate);
+}
+animate();
+</script>
+</body>
+</html>
