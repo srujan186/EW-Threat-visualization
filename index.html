@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactive Radar Display - Su-30 (Multi-Threat)</title>
+    <title>EW Radar + Doppler Engine — Su-30MKI</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -11,18 +11,71 @@
             background: #0a0e27;
             color: #00ff00;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
+            justify-content: flex-start;
             align-items: center;
             min-height: 100vh;
             padding: 20px;
         }
-        .container { display: flex; gap: 30px; max-width: 1700px; width: 100%; }
+        /* ── SCENARIO BAR ── */
+        .scenario-bar {
+            width: 100%; max-width: 2100px;
+            background: #0d1124; border: 2px solid #00ddff;
+            border-radius: 10px; padding: 14px 20px;
+            margin-bottom: 16px;
+            display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+        }
+        .scenario-bar-title { color:#00ddff; font-size:13px; font-weight:bold; letter-spacing:2px; white-space:nowrap; }
+        .scenario-bar select {
+            flex:2; min-width:220px; padding:8px 10px;
+            background:#050814; border:2px solid #00ddff;
+            color:#00ffff; font-family:'Courier New',monospace;
+            font-size:12px; border-radius:5px; cursor:pointer;
+        }
+        .scenario-bar select:focus { outline:none; }
+        .scenario-bar select option, .scenario-bar select optgroup { background:#050814; color:#00ffff; }
+        .scenario-desc-box {
+            flex:2; min-width:200px; background:#050814;
+            border:1px solid #1a3a52; border-radius:5px;
+            padding:7px 10px; font-size:10px; color:#5a8aaa; line-height:1.5;
+        }
+        .btn-run {
+            padding:9px 18px; background:#003300; border:2px solid #00ff44;
+            color:#00ff44; font-family:'Courier New',monospace;
+            font-size:12px; font-weight:bold; border-radius:5px;
+            cursor:pointer; letter-spacing:2px; transition:all .2s; white-space:nowrap;
+        }
+        .btn-run:hover { background:#00ff44; color:#001a00; }
+        .btn-save {
+            padding:9px 14px; background:#1a1a00; border:2px solid #ffcc00;
+            color:#ffcc00; font-family:'Courier New',monospace;
+            font-size:11px; font-weight:bold; border-radius:5px;
+            cursor:pointer; letter-spacing:1px; transition:all .2s; white-space:nowrap;
+        }
+        .btn-save:hover { background:#ffcc00; color:#1a1a00; }
+        .btn-del {
+            padding:5px 9px; background:#220000; border:1px solid #ff4444;
+            color:#ff4444; font-family:'Courier New',monospace;
+            font-size:10px; border-radius:4px; cursor:pointer; transition:all .2s;
+        }
+        .btn-del:hover { background:#ff4444; color:#fff; }
+        .save-name-input {
+            padding:7px 10px; background:#050814; border:2px solid #ffcc00;
+            color:#ffcc00; font-family:'Courier New',monospace;
+            font-size:11px; border-radius:5px; width:150px;
+        }
+        .save-name-input::placeholder { color:#554400; }
+        .save-name-input:focus { outline:none; }
+
+        /* ── MAIN LAYOUT ── */
+        .top-row { display:flex; gap:20px; max-width:2100px; width:100%; }
+
         .radar-container {
             background: #0d1124;
             border: 2px solid #1a3a52;
             border-radius: 10px;
             padding: 20px;
-            flex: 1;
+            flex-shrink: 0;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -35,10 +88,10 @@
         }
         .pause-banner.visible { display: block; }
         canvas {
-            background: #050814;
-            border: 2px solid #1a3a52;
+            background: #050c10;
+            border: 2px solid #0d2535;
             border-radius: 5px;
-            box-shadow: 0 0 20px rgba(0,100,150,0.3);
+            box-shadow: 0 0 30px rgba(0,80,120,0.5);
             cursor: crosshair;
         }
         .controls {
@@ -49,6 +102,7 @@
             width: 460px;
             max-height: 97vh;
             overflow-y: auto;
+            flex-shrink: 0;
         }
         .controls::-webkit-scrollbar { width: 7px; }
         .controls::-webkit-scrollbar-track { background: #050814; border-radius: 4px; }
@@ -108,8 +162,6 @@
         .traj-sub { color: #00ddff; font-size: 9px; font-weight: bold; margin: 8px 0 5px; padding-top: 7px; border-top: 1px solid #1a3a52; }
         .dynamic-opts { display: none; }
         .dynamic-opts.show { display: block; }
-        .static-opts { display: block; }
-        .static-opts.hide { display: none; }
         .badge {
             display: inline-block; padding: 2px 7px; border-radius: 3px;
             font-size: 9px; font-weight: bold; letter-spacing: 1px; margin-top: 4px;
@@ -120,7 +172,8 @@
         .badge-scurve   { background:#002244; border:1px solid #44aaff; color:#44aaff; }
         .badge-inbound  { background:#221100; border:1px solid #ff8800; color:#ff8800; }
         .badge-outbound { background:#220022; border:1px solid #ff44ff; color:#ff44ff; }
-        /* Sweep panel */
+        .badge-chook    { background:#221a00; border:1px solid #ffcc00; color:#ffcc00; }
+        /* Sweep */
         .sweep-section { margin-top: 16px; padding-top: 16px; border-top: 2px solid #1a3a52; }
         .sweep-panel { background: #050814; border: 2px solid #00ff88; border-radius: 5px; padding: 12px; }
         .sweep-panel .control-group label { font-size: 10px; color: #00ff88; }
@@ -170,91 +223,353 @@
         .legend-symbol { width: 24px; height: 12px; margin-right: 8px; border-radius: 2px; }
         .shortcut-hint { background: #060e1a; border: 1px solid #ffcc00; border-radius: 4px; padding: 7px 10px; margin-top: 10px; font-size: 10px; color: #ffcc00; text-align: center; letter-spacing: 1px; }
         .detected-tag { color: #ffff00; font-size: 9px; font-weight: bold; margin-left: 4px; }
+
+        /* ══ DOPPLER PANEL ══ */
+        .doppler-panel {
+            flex:1; min-width:0;
+            background:#0a0c1a; border:2px solid #2a1a52; border-radius:10px;
+            padding:16px; display:flex; flex-direction:column; gap:12px;
+            max-height:97vh; overflow-y:auto;
+        }
+        .doppler-panel::-webkit-scrollbar{width:5px;}
+        .doppler-panel::-webkit-scrollbar-thumb{background:#2a1a52;border-radius:3px;}
+        .dp-title{color:#cc88ff;font-size:16px;text-align:center;letter-spacing:2px;border-bottom:1px solid #2a1a52;padding-bottom:8px;}
+        .dp-inputs{background:#050814;border:1px solid #2a1a52;border-radius:6px;padding:12px;}
+        .dp-inputs label{color:#aa66ff;font-size:10px;display:block;margin-bottom:3px;}
+        .dp-inputs input,.dp-inputs select{
+            width:100%;padding:6px;background:#02030a;border:1px solid #2a1a52;
+            color:#cc88ff;font-family:'Courier New',monospace;font-size:11px;border-radius:3px;margin-bottom:8px;
+        }
+        .dp-inputs input:focus,.dp-inputs select:focus{outline:none;border-color:#cc88ff;}
+        .dp-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+        .dp-run-btn{
+            width:100%;padding:8px;background:#1a0a2e;border:2px solid #cc88ff;
+            color:#cc88ff;font-family:'Courier New',monospace;font-size:11px;font-weight:bold;
+            border-radius:4px;cursor:pointer;transition:all .2s;letter-spacing:2px;margin-top:0;
+        }
+        .dp-run-btn:hover{background:#cc88ff;color:#02030a;}
+        .dp-run-btn.computing{animation:dp-pulse 0.5s infinite alternate;}
+        @keyframes dp-pulse{from{box-shadow:0 0 4px rgba(200,136,255,.3)}to{box-shadow:0 0 16px rgba(200,136,255,.9)}}
+        .dp-results{background:#050814;border:1px solid #2a1a52;border-radius:6px;padding:12px;}
+        .dp-results-title{color:#aa66ff;font-size:10px;letter-spacing:2px;margin-bottom:8px;}
+        .dp-result-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;}
+        .dp-result-box{background:#02030a;border:1px solid #1a0a2e;border-radius:4px;padding:8px;}
+        .dp-result-box .drb-label{font-size:8px;color:#664488;letter-spacing:1px;margin-bottom:3px;}
+        .dp-result-box .drb-val{font-size:14px;font-weight:bold;color:#cc88ff;}
+        .dp-result-box .drb-unit{font-size:8px;color:#553377;margin-top:1px;}
+        .dp-result-box.positive .drb-val{color:#00ff88;}
+        .dp-result-box.negative .drb-val{color:#ff4466;}
+        .dp-result-box.neutral .drb-val{color:#ffcc00;}
+        .dp-case-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px;}
+        .dp-case-btn{
+            padding:6px 4px;background:#050814;border:1px solid #2a1a52;
+            color:#664488;font-family:'Courier New',monospace;font-size:8px;
+            border-radius:3px;cursor:pointer;text-align:center;transition:all .2s;line-height:1.3;
+        }
+        .dp-case-btn:hover{border-color:#cc88ff;color:#cc88ff;background:#0a0318;}
+        .dp-case-btn.active{background:#1a0a2e;border-color:#cc88ff;color:#ee99ff;}
+        .dp-canvas-wrap{background:#02030a;border:1px solid #1a0a2e;border-radius:4px;padding:4px;}
+        .dp-canvas-label{font-size:9px;color:#664488;text-align:center;letter-spacing:1px;margin-bottom:2px;}
+        canvas.dp-canvas{display:block;width:100%;border-radius:3px;}
+        .dp-live-section{background:#050814;border:1px solid #2a1a52;border-radius:6px;padding:10px;}
+        .dp-live-title{color:#aa66ff;font-size:10px;letter-spacing:2px;margin-bottom:8px;}
+        .dp-live-item{background:#02030a;border-left:3px solid #333;border-radius:3px;padding:7px 10px;margin-bottom:6px;}
+        .dp-live-item .dli-head{display:flex;justify-content:space-between;margin-bottom:3px;}
+        .dp-live-item .dli-id{font-size:10px;font-weight:bold;}
+        .dp-live-item .dli-fd{font-size:11px;font-weight:bold;}
+        .dp-live-item .dli-sub{font-size:8px;color:#444;line-height:1.5;}
+        .dli-approach{color:#00ff88;}
+        .dli-recede{color:#ff4466;}
+        .dli-perp{color:#ffcc00;}
+        .dp-timeline-legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px;}
+        .dp-tl-leg-item{display:flex;align-items:center;gap:4px;font-size:8px;color:#555;}
+        .dp-tl-leg-dot{width:8px;height:3px;border-radius:2px;}
+        .waveform-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+        .waveform-item{background:#02030a;border:1px solid #1a0a2e;border-radius:4px;padding:6px;}
+        .waveform-label{font-size:8px;color:#553377;letter-spacing:1px;margin-bottom:3px;text-align:center;}
+
+        /* ══ TAB SWITCHER ══ */
+        .view-tabs {
+            display:flex; gap:6px; align-items:center; margin-left:auto; flex-shrink:0;
+        }
+        .view-tab-btn {
+            padding:8px 18px; border-radius:6px; cursor:pointer;
+            font-family:'Courier New',monospace; font-size:12px; font-weight:bold;
+            letter-spacing:2px; transition:all .2s; border:2px solid #1a3a52;
+            background:#050814; color:#557799; white-space:nowrap;
+        }
+        .view-tab-btn:hover { border-color:#00ddff; color:#00ddff; }
+        .view-tab-btn.active-tab { background:#00ddff22; border-color:#00ddff; color:#00ddff; box-shadow:0 0 12px rgba(0,221,255,0.3); }
+        .view-tab-btn.doppler-tab { border-color:#2a1a52; color:#664488; }
+        .view-tab-btn.doppler-tab:hover { border-color:#cc88ff; color:#cc88ff; }
+        .view-tab-btn.doppler-tab.active-tab { background:#cc88ff22; border-color:#cc88ff; color:#cc88ff; box-shadow:0 0 12px rgba(200,136,255,0.3); }
+
+        /* ══ DOPPLER EXPANDED MODE ══ */
+        .doppler-panel.expanded {
+            max-height:none;
+            overflow-y:visible;
+        }
+        /* In doppler-view mode, bigger canvases */
+        body.doppler-view .dp-canvas-wrap canvas,
+        body.doppler-view canvas.dp-canvas {
+            min-height:0;
+        }
+        body.doppler-view #waveCanvas { height:160px !important; }
+        body.doppler-view #dvtCanvas  { height:260px !important; }
+        body.doppler-view #liveTimelineCanvas { height:220px !important; }
+        body.doppler-view .waveform-item canvas { height:110px !important; }
+        body.doppler-view .waveform-grid { grid-template-columns:1fr 1fr 1fr; gap:12px; }
+        body.doppler-view .dp-results-title { font-size:12px; }
+        body.doppler-view .dp-title { font-size:20px; }
+        body.doppler-view .dp-inputs label { font-size:11px; }
+        body.doppler-view .dp-inputs input { font-size:12px; padding:8px; }
+        body.doppler-view .dp-case-btn { font-size:10px; padding:10px 6px; }
+        body.doppler-view .dp-run-btn { font-size:13px; padding:11px; }
+        body.doppler-view .drb-val { font-size:20px !important; }
+        body.doppler-view .drb-label { font-size:10px !important; }
+        body.doppler-view .dp-result-box { padding:12px; }
+        body.doppler-view .dp-live-item .dli-fd { font-size:16px !important; }
+        body.doppler-view .dp-live-item .dli-id { font-size:13px !important; }
+        body.doppler-view .dp-live-item .dli-sub { font-size:10px !important; }
+        body.doppler-view .dp-live-title { font-size:13px; }
+        body.doppler-view .dp-canvas-label { font-size:11px; margin-bottom:6px; }
+        /* expanded doppler panel layout: 2-col for calc+results side by side */
+        body.doppler-view .doppler-panel {
+            display:grid;
+            grid-template-columns:1fr 1fr;
+            grid-template-rows:auto;
+            gap:16px;
+            align-items:start;
+        }
+        body.doppler-view .dp-title { grid-column:1/-1; }
+        body.doppler-view .dp-live-section { grid-column:1/-1; }
+        body.doppler-view .dp-results:last-child { grid-column:1/-1; } /* all 6 waveforms */
     </style>
 </head>
 <body>
-<div class="container">
-    <div class="radar-container">
-        <div class="radar-title">EW THREAT DISPLAY — SU-30MKI</div>
-        <div class="pause-banner" id="pauseBanner">⏸ SIMULATION PAUSED — PRESS [SPACE] TO RESUME</div>
-        <canvas id="radarCanvas" width="700" height="700"></canvas>
+
+<!-- ══ SCENARIO BAR ══ -->
+<div class="scenario-bar">
+    <div class="scenario-bar-title">📋 SCENARIO</div>
+    <select id="scenarioSelect" onchange="onScenarioChange()">
+        <option value="">— Select a Scenario —</option>
+        <optgroup label="── BASIC ──">
+            <option value="single_search">01 · Single Search Emitter</option>
+            <option value="single_missile">02 · Inbound Missile Threat</option>
+        </optgroup>
+        <optgroup label="── MULTI-THREAT ──">
+            <option value="pincer_attack">03 · Pincer Attack (2 Track Radars)</option>
+            <option value="sam_battery">04 · SAM Battery (Acquisition + Missile)</option>
+            <option value="saturation">05 · Saturation — 6 Mixed Emitters</option>
+        </optgroup>
+        <optgroup label="── DYNAMIC ──">
+            <option value="pop_up_threat">06 · Pop-Up Threat (S-Curve Ingress)</option>
+            <option value="escort_jamming">07 · Escort Formation (TWS + Search)</option>
+            <option value="cruise_missile_salvo">08 · Cruise Missile Salvo (4 Missiles)</option>
+        </optgroup>
+        <optgroup label="── ADVANCED ──">
+            <option value="ambush">09 · Ambush — Multiple Arcs</option>
+            <option value="full_attack">10 · Full Strike Package</option>
+        </optgroup>
+        <optgroup label="── C-HOOK ──">
+            <option value="c_hook_tail">11 · C-Hook Tail Chase (L+R)</option>
+            <option value="cross_straight">12 · Parallel Pass (L+R)</option>
+        </optgroup>
+        <optgroup label="── SAVED ──" id="savedOptGroup"></optgroup>
+    </select>
+    <div class="scenario-desc-box" id="scenarioDesc">Select a scenario to load a pre-configured tactical situation.</div>
+    <button class="btn-run" id="btnRun" onclick="runScenario()">▶ RUN</button>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <input class="save-name-input" id="saveNameInput" type="text" maxlength="30" placeholder="Name your scenario…">
+        <button class="btn-save" onclick="saveCurrentScenario()">💾 SAVE SCENARIO</button>
+        <button class="btn-del" id="btnDelSaved" onclick="deleteSavedScenario()" style="display:none">🗑 DELETE</button>
     </div>
-    <div class="controls">
-        <div class="controls-title">EMITTER PARAMETERS</div>
-        <div class="control-group">
-            <label>NUMBER OF THREATS (1–16)</label>
-            <input type="number" id="numThreats" min="1" max="16" value="1" step="1">
-        </div>
-        <div class="control-group">
-            <button id="clearButton" style="background:#8b0000;border-color:#ff4444;color:#ff8888;">CLEAR ALL THREATS</button>
-        </div>
-        <button class="pause-btn" id="pauseBtn">⏸ PAUSE SIMULATION [SPACE]</button>
-        <div class="info-display">
-            <div class="info-row"><span class="info-label">Active Threats:</span><span class="info-value" id="activeThreatsCount">1</span></div>
-            <div class="info-row"><span class="info-label">Detected by Sweep:</span><span class="info-value" id="detectedCount">0</span></div>
-            <div class="info-row"><span class="info-label">Enemy Aircraft:</span><span class="info-value" id="enemyStatusInfo">STANDBY</span></div>
-            <div class="info-row"><span class="info-label">Aircraft:</span><span class="info-value">Su-30MKI</span></div>
-            <div class="info-row"><span class="info-label">SIM STATUS:</span><span class="info-value" id="simStatus">RUNNING</span></div>
-        </div>
-        <div class="threats-section">
-            <div class="section-title">THREAT CONFIGURATIONS</div>
-            <div id="threatsContainer"></div>
-        </div>
+    <div class="view-tabs">
+        <button class="view-tab-btn active-tab" id="tabRadar" onclick="switchView('radar')">🖥 RADAR</button>
+        <button class="view-tab-btn doppler-tab" id="tabDoppler" onclick="switchView('doppler')">📡 DOPPLER</button>
+    </div>
+</div>
 
-        <!-- SWEEP SECTION -->
-        <div class="sweep-section">
-            <div class="section-title">📡 RADAR SWEEP</div>
-            <div class="sweep-status-bar">
-                <span style="color:#00ff88;">STATUS:</span>
-                <span class="sweep-phase-value" id="sweepStatusDisplay">OFF</span>
-            </div>
-            <div class="sweep-panel">
-                <div class="control-group"><label>SWEEP SPEED (1–10)</label>
-                    <input type="number" id="sweepSpeed" min="1" max="10" value="3" step="1"></div>
-                <div class="control-group"><label>SWEEP WIDTH (°)</label>
-                    <input type="number" id="sweepWidth" min="5" max="40" value="15" step="5"></div>
-                <div class="control-group"><label>SWEEP RANGE (km)</label>
-                    <input type="number" id="sweepRange" min="50" max="200" value="200" step="10"></div>
-            </div>
-            <button class="sweep-btn" id="sweepToggleBtn">📡 ACTIVATE SWEEP</button>
-        </div>
+<div class="top-row">
 
-        <div class="enemy-section">
-            <div class="section-title">✈ ENEMY AIRCRAFT</div>
-            <div class="enemy-status-bar">
-                <span style="color:#ff6688;">MISSION PHASE:</span>
-                <span class="enemy-phase-value" id="enemyPhaseDisplay">STANDBY</span>
-            </div>
-            <div class="enemy-panel">
-                <div class="control-group"><label>ENTRY BEARING (°)</label><input type="number" id="enemyEntryAngle" min="-180" max="180" value="135" step="5"></div>
-                <div class="control-group"><label>DROP RANGE (km)</label><input type="number" id="enemyDropRange" min="20" max="150" value="60" step="10"></div>
-                <div class="row2">
-                    <div class="control-group"><label>INGRESS SPEED (1–10)</label><input type="number" id="enemyIngressSpeed" min="1" max="10" value="4" step="1"></div>
-                    <div class="control-group"><label>EGRESS SPEED (1–10)</label><input type="number" id="enemyEgressSpeed" min="1" max="10" value="7" step="1"></div>
-                </div>
-                <div class="control-group"><label>MISSILE SPEED (1–10)</label><input type="number" id="enemyMissileSpeed" min="1" max="10" value="6" step="1"></div>
-                <div class="control-group"><label>MISSILES TO DROP (1–4)</label><input type="number" id="enemyMissileCount" min="1" max="4" value="2" step="1"></div>
-            </div>
-            <button class="scramble-btn" id="scrambleBtn">⚠ SCRAMBLE ENEMY</button>
-            <button class="abort-btn" id="abortEnemyBtn">✕ ABORT MISSION</button>
+<!-- ══ RADAR CANVAS ══ -->
+<div class="radar-container" id="radarContainer">
+    <div class="radar-title">EW THREAT DISPLAY — SU-30MKI</div>
+    <div class="pause-banner" id="pauseBanner">⏸ SIMULATION PAUSED — PRESS [SPACE] TO RESUME</div>
+    <canvas id="radarCanvas" width="700" height="700"></canvas>
+</div>
+
+<!-- ══ CONTROLS ══ -->
+<div class="controls" id="controlsPanel">
+    <div class="controls-title">EMITTER PARAMETERS</div>
+    <div class="control-group">
+        <label>NUMBER OF THREATS (1–16)</label>
+        <input type="number" id="numThreats" min="1" max="16" value="1" step="1">
+    </div>
+    <div class="control-group">
+        <button id="clearButton" style="background:#8b0000;border-color:#ff4444;color:#ff8888;">CLEAR ALL THREATS</button>
+    </div>
+    <button class="pause-btn" id="pauseBtn">⏸ PAUSE SIMULATION [SPACE]</button>
+    <div class="info-display">
+        <div class="info-row"><span class="info-label">Active Threats:</span><span class="info-value" id="activeThreatsCount">1</span></div>
+        <div class="info-row"><span class="info-label">Detected by Sweep:</span><span class="info-value" id="detectedCount">0</span></div>
+        <div class="info-row"><span class="info-label">Enemy Aircraft:</span><span class="info-value" id="enemyStatusInfo">STANDBY</span></div>
+        <div class="info-row"><span class="info-label">Aircraft:</span><span class="info-value">Su-30MKI</span></div>
+        <div class="info-row"><span class="info-label">SIM STATUS:</span><span class="info-value" id="simStatus">RUNNING</span></div>
+    </div>
+    <div class="threats-section">
+        <div class="section-title">THREAT CONFIGURATIONS</div>
+        <div id="threatsContainer"></div>
+    </div>
+
+    <!-- SWEEP -->
+    <div class="sweep-section">
+        <div class="section-title">📡 RADAR SWEEP</div>
+        <div class="sweep-status-bar">
+            <span style="color:#00ff88;">STATUS:</span>
+            <span class="sweep-phase-value" id="sweepStatusDisplay">OFF</span>
         </div>
-        <div class="shortcut-hint">⌨ [SPACE] — PAUSE / RESUME ALL MOTION</div>
-        <div class="legend">
-            <div class="legend-title">TRAJECTORY GUIDE</div>
-            <div class="legend-item"><div class="legend-symbol" style="background:rgba(0,255,136,0.2);border:1px solid #00ff88;"></div><span style="color:#00ff88;">Straight — direct A→B line</span></div>
-            <div class="legend-item"><div class="legend-symbol" style="background:rgba(68,170,255,0.2);border:1px solid #44aaff;"></div><span style="color:#44aaff;">S-Curve — S-shape between A→B</span></div>
-            <div class="legend-item"><div class="legend-symbol" style="background:rgba(255,136,0,0.2);border:1px solid #ff8800;"></div><span style="color:#ff8800;">Inbound Parabolic — arc toward centre</span></div>
-            <div class="legend-item"><div class="legend-symbol" style="background:rgba(255,68,255,0.2);border:1px solid #ff44ff;"></div><span style="color:#ff44ff;">Outbound Parabolic — arc away from centre</span></div>
-            <div style="margin-top:8px;font-size:10px;color:#888;line-height:1.7;">
-                <span style="color:#ffaa00;">●</span> Start point &nbsp; <span style="color:#ff4444;">■</span> End point<br>
-                Dashed ghost path shows full trajectory<br>
-                Shape rotates to face direction of travel<br>
-                □ Search | △ Track | ◇ TWS | ✱ Acq | ⊕ Missile | # Unknown<br>
-                <span style="color:#ffff00;">⚡ DETECTED</span> — swept by radar beam
+        <div class="sweep-panel">
+            <div class="control-group"><label>SWEEP SPEED (1–10)</label><input type="number" id="sweepSpeed" min="1" max="10" value="3" step="1"></div>
+            <div class="control-group"><label>SWEEP WIDTH (°)</label><input type="number" id="sweepWidth" min="5" max="40" value="15" step="5"></div>
+            <div class="control-group"><label>SWEEP RANGE (km)</label><input type="number" id="sweepRange" min="50" max="200" value="200" step="10"></div>
+        </div>
+        <button class="sweep-btn" id="sweepToggleBtn">📡 ACTIVATE SWEEP</button>
+    </div>
+
+    <!-- ENEMY -->
+    <div class="enemy-section">
+        <div class="section-title">✈ ENEMY AIRCRAFT</div>
+        <div class="enemy-status-bar">
+            <span style="color:#ff6688;">MISSION PHASE:</span>
+            <span class="enemy-phase-value" id="enemyPhaseDisplay">STANDBY</span>
+        </div>
+        <div class="enemy-panel">
+            <div class="control-group"><label>ENTRY BEARING (°)</label><input type="number" id="enemyEntryAngle" min="-180" max="180" value="135" step="5"></div>
+            <div class="control-group"><label>DROP RANGE (km)</label><input type="number" id="enemyDropRange" min="20" max="150" value="60" step="10"></div>
+            <div class="row2">
+                <div class="control-group"><label>INGRESS SPEED (1–10)</label><input type="number" id="enemyIngressSpeed" min="1" max="10" value="4" step="1"></div>
+                <div class="control-group"><label>EGRESS SPEED (1–10)</label><input type="number" id="enemyEgressSpeed" min="1" max="10" value="7" step="1"></div>
             </div>
+            <div class="control-group"><label>MISSILE SPEED (1–10)</label><input type="number" id="enemyMissileSpeed" min="1" max="10" value="6" step="1"></div>
+            <div class="control-group"><label>MISSILES TO DROP (1–4)</label><input type="number" id="enemyMissileCount" min="1" max="4" value="2" step="1"></div>
+        </div>
+        <button class="scramble-btn" id="scrambleBtn">⚠ SCRAMBLE ENEMY</button>
+        <button class="abort-btn" id="abortEnemyBtn">✕ ABORT MISSION</button>
+    </div>
+
+    <div class="shortcut-hint">⌨ [SPACE] — PAUSE / RESUME ALL MOTION</div>
+    <div class="legend">
+        <div class="legend-title">TRAJECTORY GUIDE</div>
+        <div class="legend-item"><div class="legend-symbol" style="background:rgba(0,255,136,0.2);border:1px solid #00ff88;"></div><span style="color:#00ff88;">Straight — direct A→B line</span></div>
+        <div class="legend-item"><div class="legend-symbol" style="background:rgba(68,170,255,0.2);border:1px solid #44aaff;"></div><span style="color:#44aaff;">S-Curve — S-shape between A→B</span></div>
+        <div class="legend-item"><div class="legend-symbol" style="background:rgba(255,136,0,0.2);border:1px solid #ff8800;"></div><span style="color:#ff8800;">Inbound Parabolic — arc toward centre</span></div>
+        <div class="legend-item"><div class="legend-symbol" style="background:rgba(255,68,255,0.2);border:1px solid #ff44ff;"></div><span style="color:#ff44ff;">Outbound Parabolic — arc away from centre</span></div>
+        <div style="margin-top:8px;font-size:10px;color:#888;line-height:1.7;">
+            <span style="color:#ffaa00;">●</span> Start &nbsp; <span style="color:#ff4444;">■</span> End<br>
+            □ Search | △ Track | ◇ TWS | ✱ Acq | ⊕ Missile | # Unknown<br>
+            <span style="color:#ffff00;">⚡ DETECTED</span> — swept by radar beam
         </div>
     </div>
 </div>
+
+<!-- ══ DOPPLER ENGINE ══ -->
+<div class="doppler-panel" id="dopplerPanel">
+    <div class="dp-title">📡 DOPPLER ENGINE</div>
+
+    <!-- Manual Calculator -->
+    <div class="dp-inputs">
+        <div style="color:#aa66ff;font-size:10px;letter-spacing:2px;margin-bottom:10px;border-bottom:1px solid #1a0a2e;padding-bottom:6px;">
+            MANUAL DOPPLER CALCULATOR
+        </div>
+        <div class="dp-row">
+            <div><label>CARRIER FREQ (GHz)</label><input type="number" id="dp_fc" value="10" min="0.1" max="100" step="0.1"></div>
+            <div><label>TARGET SPEED (m/s)</label><input type="number" id="dp_vt" value="300" min="0" max="3000" step="10"></div>
+        </div>
+        <div class="dp-row">
+            <div><label>RADAR SPEED (m/s)</label><input type="number" id="dp_vr" value="200" min="0" max="3000" step="10"></div>
+            <div><label>ANGLE θ (° for cases 3/6)</label><input type="number" id="dp_theta" value="45" min="-180" max="180" step="1"></div>
+        </div>
+        <div style="color:#664488;font-size:9px;margin-bottom:6px;letter-spacing:1px;">SELECT MOTION CASE:</div>
+        <div class="dp-case-grid" id="caseGrid">
+            <div class="dp-case-btn active" data-case="1" onclick="selectCase(1)">CASE 1<br>Head-On<br>Approaching</div>
+            <div class="dp-case-btn" data-case="2" onclick="selectCase(2)">CASE 2<br>Same Dir<br>Chasing</div>
+            <div class="dp-case-btn" data-case="3" onclick="selectCase(3)">CASE 3<br>Perp<br>Motion</div>
+            <div class="dp-case-btn" data-case="4" onclick="selectCase(4)">CASE 4<br>Head-On<br>Separating</div>
+            <div class="dp-case-btn" data-case="5" onclick="selectCase(5)">CASE 5<br>Radar<br>Following</div>
+            <div class="dp-case-btn" data-case="6" onclick="selectCase(6)">CASE 6<br>Arbitrary<br>Angle</div>
+        </div>
+        <button class="dp-run-btn" id="dpRunBtn" onclick="runDopplerCalc()">▶ COMPUTE DOPPLER</button>
+    </div>
+
+    <!-- Results -->
+    <div class="dp-results" id="dpResultsBox">
+        <div class="dp-results-title">DOPPLER RESULTS</div>
+        <div class="dp-result-grid">
+            <div class="dp-result-box" id="res_vrel"><div class="drb-label">RELATIVE VELOCITY</div><div class="drb-val">—</div><div class="drb-unit">m/s</div></div>
+            <div class="dp-result-box" id="res_fd"><div class="drb-label">DOPPLER SHIFT</div><div class="drb-val">—</div><div class="drb-unit">Hz</div></div>
+            <div class="dp-result-box" id="res_fr"><div class="drb-label">RECEIVED FREQ</div><div class="drb-val">—</div><div class="drb-unit">GHz</div></div>
+            <div class="dp-result-box" id="res_case"><div class="drb-label">CASE TYPE</div><div class="drb-val">—</div><div class="drb-unit">motion scenario</div></div>
+        </div>
+        <div class="dp-canvas-label">RECEIVED SIGNAL WAVEFORM — SELECTED CASE</div>
+        <div class="dp-canvas-wrap">
+            <canvas class="dp-canvas" id="waveCanvas" height="80"></canvas>
+        </div>
+    </div>
+
+    <!-- Doppler vs Time -->
+    <div class="dp-inputs">
+        <div style="color:#aa66ff;font-size:10px;letter-spacing:2px;margin-bottom:10px;border-bottom:1px solid #1a0a2e;padding-bottom:6px;">
+            DOPPLER vs TIME SIMULATOR
+        </div>
+        <div class="dp-row">
+            <div><label>INITIAL X (m)</label><input type="number" id="dvt_x0" value="50000" step="1000"></div>
+            <div><label>INITIAL Y (m)</label><input type="number" id="dvt_y0" value="30000" step="1000"></div>
+        </div>
+        <div class="dp-row">
+            <div><label>SPEED (m/s)</label><input type="number" id="dvt_v" value="300" min="1" max="3000" step="10"></div>
+            <div><label>ANGLE OF MOTION (°)</label><input type="number" id="dvt_theta" value="200" min="-180" max="360" step="5"></div>
+        </div>
+        <div class="dp-row">
+            <div><label>TIME STEP (s)</label><input type="number" id="dvt_dt" value="0.5" min="0.01" max="5" step="0.1"></div>
+            <div><label>TOTAL TIME (s)</label><input type="number" id="dvt_tmax" value="60" min="1" max="300" step="5"></div>
+        </div>
+        <button class="dp-run-btn" onclick="runDopplerVsTime()">▶ RUN TIME SIMULATION</button>
+    </div>
+
+    <!-- Doppler vs Time plot -->
+    <div class="dp-results">
+        <div class="dp-results-title">DOPPLER FREQUENCY vs TIME</div>
+        <div class="dp-canvas-wrap">
+            <canvas class="dp-canvas" id="dvtCanvas" height="130"></canvas>
+        </div>
+        <div id="dvtStats" style="font-size:9px;color:#553377;margin-top:6px;line-height:1.6;"></div>
+    </div>
+
+    <!-- Live Doppler -->
+    <div class="dp-live-section">
+        <div class="dp-live-title">⚡ LIVE DOPPLER — ACTIVE THREATS</div>
+        <div style="font-size:9px;color:#2a1a52;margin-bottom:8px;">
+            Carrier: <input type="number" id="liveFC" value="10" min="0.1" max="100" step="0.1"
+            style="width:60px;padding:2px 4px;background:#02030a;border:1px solid #2a1a52;color:#cc88ff;font-size:9px;border-radius:2px;"> GHz &nbsp;|&nbsp; Updates live from radar canvas
+        </div>
+        <div id="liveDopplerList"></div>
+        <div class="dp-canvas-label" style="margin-top:8px;">LIVE DOPPLER HISTORY (all threats)</div>
+        <div class="dp-canvas-wrap">
+            <canvas class="dp-canvas" id="liveTimelineCanvas" height="100"></canvas>
+        </div>
+        <div class="dp-timeline-legend" id="timelineLegend"></div>
+    </div>
+
+    <!-- All 6 waveforms -->
+    <div class="dp-results">
+        <div class="dp-results-title">ALL 6 CASE WAVEFORMS</div>
+        <div class="waveform-grid" id="allWaveforms"></div>
+    </div>
+</div><!-- /doppler-panel -->
+
+</div><!-- /top-row -->
+
 <script>
 // ═══════════════════════════════════════════════
 //  CONSTANTS & HELPERS
@@ -284,7 +599,6 @@ const THREAT_COLORS = [
     '#0088ff','#aaff00','#ff0066','#8800ff','#ff9999','#99ffbb',
     '#ffff99','#ff99ff','#99ffff','#ffffff'
 ];
-
 const THREAT_TYPES = ['search','track','trackWhileScan','acquisition','missile','unknown'];
 const THREAT_LABELS = { search:'Search (□)', track:'Track (△)', trackWhileScan:'TWS (◇)', acquisition:'Acquisition (✱)', missile:'Missile (⊕)', unknown:'Unknown (#)' };
 const THREAT_SYMBOLS = { search:'□', track:'△', trackWhileScan:'◇', acquisition:'✱', missile:'⊕', unknown:'#' };
@@ -341,6 +655,23 @@ function trajOutboundParabolic(start, end, t) {
     const ctrl = { x:mid.x+(awX/dist)*amp, y:mid.y+(awY/dist)*amp };
     return quadBezier(start, ctrl, end, t);
 }
+function trajCHook(start, end, t, divergeKm) {
+    const divergePx = (divergeKm || 60) * (MAX_R / MAX_KM);
+    const dxIn = CX - start.x, dyIn = CY - start.y;
+    const distIn = Math.sqrt(dxIn * dxIn + dyIn * dyIn) || 1;
+    const uxIn = dxIn / distIn, uyIn = dyIn / distIn;
+    const divergePoint = { x: CX - uxIn * divergePx, y: CY - uyIn * divergePx };
+    const px = -uyIn, py = uxIn;
+    const swingAmp = divergePx * 0.9;
+    const hookPeak = { x: divergePoint.x + px * swingAmp, y: divergePoint.y + py * swingAmp };
+    const followPoint = {
+        x: CX + px * divergePx * 0.6 - uxIn * divergePx * 0.8,
+        y: CY + py * divergePx * 0.6 - uyIn * divergePx * 0.8
+    };
+    if (t <= 0.35) return lerp(start, divergePoint, t / 0.35);
+    else if (t <= 0.65) return quadBezier(divergePoint, hookPeak, followPoint, (t - 0.35) / 0.30);
+    else return lerp(followPoint, end, (t - 0.65) / 0.35);
+}
 function getPosition(th, t) {
     const sp = polarToXY(th.startBearing, th.startRange);
     const ep = polarToXY(th.endBearing,   th.endRange);
@@ -348,6 +679,7 @@ function getPosition(th, t) {
         case 'scurve':             return trajSCurve(sp, ep, t);
         case 'inbound_parabolic':  return trajInboundParabolic(sp, ep, t);
         case 'outbound_parabolic': return trajOutboundParabolic(sp, ep, t);
+        case 'c_hook':             return trajCHook(sp, ep, t, th.divergeRange);
         default:                   return trajStraight(sp, ep, t);
     }
 }
@@ -356,11 +688,6 @@ function buildPath(th, steps=60) {
     for(let i=0;i<=steps;i++) pts.push(getPosition(th,i/steps));
     return pts;
 }
-
-// ═══════════════════════════════════════════════
-//  DYNAMIC SCAN BOUNDS FROM TRAJECTORY
-//  Computes scanDirection, scanAngle, range to cover full path
-// ═══════════════════════════════════════════════
 function computeDynamicScanFromPath(th) {
     const pts = buildPath(th, 80);
     let minAngle = Infinity, maxAngle = -Infinity, maxRange = 0;
@@ -375,12 +702,8 @@ function computeDynamicScanFromPath(th) {
         if (km > maxRange) maxRange = km;
     });
     const center = (minAngle + maxAngle) / 2;
-    const halfSpan = Math.min(180, (maxAngle - minAngle) / 2 + 8); // +8 padding
-    return {
-        scanDirection: center,
-        scanAngle: Math.max(5, halfSpan),
-        range: Math.min(200, maxRange + 10)
-    };
+    const halfSpan = Math.min(180, (maxAngle - minAngle) / 2 + 8);
+    return { scanDirection: center, scanAngle: Math.max(5, halfSpan), range: Math.min(200, maxRange + 10) };
 }
 
 // ═══════════════════════════════════════════════
@@ -389,10 +712,7 @@ function computeDynamicScanFromPath(th) {
 let paused = false;
 let rs = {
     numThreats:1, threats:[],
-    sweep:{
-        active:false, angle:0, speed:3, width:15, range:200,
-        detected:new Set()
-    },
+    sweep:{ active:false, angle:0, speed:3, width:15, range:200, detected:new Set() },
     enemy:{
         active:false,phase:'standby',x:0,y:0,angle:0,
         entryAngle:135,dropRange:60,ingressSpeed:4,egressSpeed:7,
@@ -401,47 +721,36 @@ let rs = {
 };
 
 const PRESETS = {
-    search        :{ angle:30,  range:80,  pages:2 },
-    track         :{ angle:20,  range:100, pages:1 },
-    trackWhileScan:{ angle:10,  range:80,  pages:1 },
-    acquisition   :{ angle:55,  range:80,  pages:2 },
-    missile       :{ angle:10,  range:50,  pages:1 },
-    unknown       :{ angle:180, range:50,  pages:1 }
+    search:{ angle:30, range:80, pages:2 }, track:{ angle:20, range:100, pages:1 },
+    trackWhileScan:{ angle:10, range:80, pages:1 }, acquisition:{ angle:55, range:80, pages:2 },
+    missile:{ angle:10, range:50, pages:1 }, unknown:{ angle:180, range:50, pages:1 }
 };
 
-// ═══════════════════════════════════════════════
-//  THREAT INIT
-// ═══════════════════════════════════════════════
 function initThreats() {
     rs.threats=[];
     for(let i=0;i<rs.numThreats;i++){
-        const type = 'search';
-        const p=PRESETS[type];
-        const dir=(360/rs.numThreats)*i;
+        const type='search', p=PRESETS[type], dir=(360/rs.numThreats)*i;
         rs.threats.push({
-            id:i+1, threatType: type,
-            scanDirection:dir, scanAngle:p.angle, range:p.range, numPages:p.pages,
+            id:i+1, threatType:type, scanDirection:dir, scanAngle:p.angle, range:p.range, numPages:p.pages,
             color:THREAT_COLORS[i%THREAT_COLORS.length],
             motionMode:'static', trajectory:'straight',
-            startBearing:dir,     startRange:150,
-            endBearing  :dir+40,  endRange  :40,
-            velocity    :0.004,
+            startBearing:dir, startRange:150, endBearing:dir+40, endRange:40,
+            velocity:0.004, divergeRange:60,
             t:0, tDir:1, trail:[], _pos:null,
-            detected:false, detectedTimer:0
+            detected:false, detectedTimer:0,
+            _prevDistM:null, _doppler:0, _dopplerHistory:[]
         });
     }
 }
 
 // ═══════════════════════════════════════════════
-//  BUILD UI
+//  THREAT UI
 // ═══════════════════════════════════════════════
 function createUI() {
-    const c=document.getElementById('threatsContainer');
-    c.innerHTML='';
+    const c=document.getElementById('threatsContainer'); c.innerHTML='';
     rs.threats.forEach((th,i)=>{
         const open=(i===0);
-        const div=document.createElement('div');
-        div.className='threat-item';
+        const div=document.createElement('div'); div.className='threat-item';
         div.innerHTML=`
 <div class="threat-header" onclick="toggleT(${i})">
     <div>
@@ -451,28 +760,19 @@ function createUI() {
     <span class="threat-toggle ${open?'open':''}">▼</span>
 </div>
 <div class="threat-content ${open?'open':''}" id="tc-${i}">
-
-    <!-- PER-THREAT TYPE SELECTOR -->
-    <div class="control-group">
-        <label>THREAT TYPE</label>
+    <div class="control-group"><label>THREAT TYPE</label>
         <select onchange="setThreatType(${i},this.value)">
             ${THREAT_TYPES.map(t=>`<option value="${t}" ${th.threatType===t?'selected':''}>${THREAT_LABELS[t]}</option>`).join('')}
         </select>
     </div>
-
     <div class="control-group"><label>SCAN DIRECTION (°)</label>
-        <input type="number" id="sd-${i}" min="-180" max="180" value="${th.scanDirection}" step="1"
-               onchange="setF(${i},'scanDirection',+this.value)"></div>
+        <input type="number" id="sd-${i}" min="-180" max="180" value="${th.scanDirection}" step="1" onchange="setF(${i},'scanDirection',+this.value)"></div>
     <div class="control-group"><label>SCAN ANGLE (±°)</label>
-        <input type="number" id="sa-${i}" min="0" max="180" value="${th.scanAngle}" step="1"
-               onchange="setF(${i},'scanAngle',+this.value)"></div>
+        <input type="number" id="sa-${i}" min="0" max="180" value="${th.scanAngle}" step="1" onchange="setF(${i},'scanAngle',+this.value)"></div>
     <div class="control-group"><label>RANGE (km)</label>
-        <input type="number" id="rng-${i}" min="20" max="200" value="${th.range}" step="10"
-               onchange="setF(${i},'range',+this.value)"></div>
+        <input type="number" id="rng-${i}" min="20" max="200" value="${th.range}" step="10" onchange="setF(${i},'range',+this.value)"></div>
     <div class="control-group"><label>NUMBER OF PAGES</label>
-        <input type="number" min="1" max="10" value="${th.numPages}" step="1"
-               onchange="setF(${i},'numPages',+this.value)"></div>
-
+        <input type="number" min="1" max="10" value="${th.numPages}" step="1" onchange="setF(${i},'numPages',+this.value)"></div>
     <div class="traj-panel">
         <div class="traj-panel-title">⬡ MOTION CONFIGURATION</div>
         <div class="control-group"><label>MOTION MODE</label>
@@ -491,6 +791,7 @@ function createUI() {
                     <option value="scurve"             ${th.trajectory==='scurve'?'selected':''}>S-Curve — S-shaped path A→B</option>
                     <option value="inbound_parabolic"  ${th.trajectory==='inbound_parabolic'?'selected':''}>Inbound Parabolic — arc toward centre</option>
                     <option value="outbound_parabolic" ${th.trajectory==='outbound_parabolic'?'selected':''}>Outbound Parabolic — arc away from centre</option>
+                    <option value="c_hook"             ${th.trajectory==='c_hook'?'selected':''}>C-Hook — straight in, hook around, straight out</option>
                 </select>
                 <span class="badge badge-straight" id="tb-${i}">▶ STRAIGHT</span>
             </div>
@@ -519,6 +820,10 @@ function createUI() {
             <div class="control-group"><label>SPEED (1–20)</label>
                 <input type="number" min="1" max="20" value="${Math.round(th.velocity*1000)}" step="1"
                        onchange="setF(${i},'velocity',this.value/1000)"></div>
+            <div class="traj-sub" style="color:#ffcc00;">↩ C-HOOK SETTINGS</div>
+            <div class="control-group"><label>DIVERGE DISTANCE FROM AIRCRAFT (km)</label>
+                <input type="number" min="10" max="180" value="${th.divergeRange||60}" step="5"
+                       onchange="setF(${i},'divergeRange',+this.value);clearTrail(${i})"></div>
         </div>
     </div>
 </div>`;
@@ -526,16 +831,11 @@ function createUI() {
     });
 }
 
-window.toggleT    = i=>{
-    const ct=document.getElementById(`tc-${i}`);
-    const tg=ct.previousElementSibling.querySelector('.threat-toggle');
-    ct.classList.toggle('open'); tg.classList.toggle('open');
-    ct.previousElementSibling.classList.toggle('active');
-};
+window.toggleT    = i=>{ const ct=document.getElementById(`tc-${i}`),tg=ct.previousElementSibling.querySelector('.threat-toggle'); ct.classList.toggle('open');tg.classList.toggle('open');ct.previousElementSibling.classList.toggle('active'); };
 window.setF       = (i,f,v)=>{ rs.threats[i][f]=v; };
-window.clearTrail = i=>{ rs.threats[i].trail=[]; rs.threats[i].t=0; };
+window.clearTrail = i=>{ rs.threats[i].trail=[];rs.threats[i].t=0;rs.threats[i]._prevDistM=null; };
 window.setMode    = (i,m)=>{
-    const th=rs.threats[i]; th.motionMode=m; th.t=0; th.tDir=1; th.trail=[]; th._pos=null;
+    const th=rs.threats[i]; th.motionMode=m; th.t=0; th.tDir=1; th.trail=[]; th._pos=null; th._prevDistM=null;
     const mb=document.getElementById(`mb-${i}`);
     mb.textContent=m==='static'?'◉ STATIC':'▶ DYNAMIC';
     mb.className=`badge ${m==='static'?'badge-static':'badge-dynamic'}`;
@@ -543,28 +843,18 @@ window.setMode    = (i,m)=>{
     m==='dynamic'?do_.classList.add('show'):do_.classList.remove('show');
 };
 window.setTraj    = (i,tj)=>{
-    rs.threats[i].trajectory=tj; rs.threats[i].trail=[]; rs.threats[i].t=0;
+    rs.threats[i].trajectory=tj; rs.threats[i].trail=[]; rs.threats[i].t=0; rs.threats[i]._prevDistM=null;
     const map={
-        straight          :['▶ STRAIGHT',     'badge-straight'],
-        scurve            :['〜 S-CURVE',      'badge-scurve'  ],
-        inbound_parabolic :['⌒ INBOUND PARA', 'badge-inbound' ],
-        outbound_parabolic:['⌣ OUTBOUND PARA','badge-outbound'],
+        straight:['▶ STRAIGHT','badge-straight'], scurve:['〜 S-CURVE','badge-scurve'],
+        inbound_parabolic:['⌒ INBOUND PARA','badge-inbound'],
+        outbound_parabolic:['⌣ OUTBOUND PARA','badge-outbound'], c_hook:['↩ C-HOOK','badge-chook'],
     };
-    const b=document.getElementById(`tb-${i}`);
-    b.textContent=map[tj][0]; b.className=`badge ${map[tj][1]}`;
+    const b=document.getElementById(`tb-${i}`); b.textContent=map[tj][0]; b.className=`badge ${map[tj][1]}`;
 };
-window.setThreatType = (i, type) => {
-    const th = rs.threats[i];
-    th.threatType = type;
-    const p = PRESETS[type];
-    // Update scan defaults if static
-    if(th.motionMode === 'static') {
-        th.scanAngle = p.angle;
-        th.range = p.range;
-        th.numPages = p.pages;
-    }
-    // Update title
-    document.getElementById(`th-title-${i}`).textContent = `Threat ${th.id} — ${type.toUpperCase()} ${THREAT_SYMBOLS[type]}`;
+window.setThreatType = (i,type)=>{
+    const th=rs.threats[i]; th.threatType=type; const p=PRESETS[type];
+    if(th.motionMode==='static'){th.scanAngle=p.angle;th.range=p.range;th.numPages=p.pages;}
+    document.getElementById(`th-title-${i}`).textContent=`Threat ${th.id} — ${type.toUpperCase()} ${THREAT_SYMBOLS[type]}`;
 };
 
 // ═══════════════════════════════════════════════
@@ -572,376 +862,192 @@ window.setThreatType = (i, type) => {
 // ═══════════════════════════════════════════════
 function togglePause() {
     paused = !paused;
-    const btn = document.getElementById('pauseBtn');
-    const banner = document.getElementById('pauseBanner');
-    const sim = document.getElementById('simStatus');
-    if(paused) {
-        btn.textContent = '▶ RESUME SIMULATION [SPACE]';
-        btn.classList.add('paused');
-        banner.classList.add('visible');
-        sim.textContent = 'PAUSED';
-        sim.style.color = '#ffcc00';
-    } else {
-        btn.textContent = '⏸ PAUSE SIMULATION [SPACE]';
-        btn.classList.remove('paused');
-        banner.classList.remove('visible');
-        sim.textContent = 'RUNNING';
-        sim.style.color = '#00ff00';
-    }
+    const btn=document.getElementById('pauseBtn'), banner=document.getElementById('pauseBanner'), sim=document.getElementById('simStatus');
+    if(paused){btn.textContent='▶ RESUME SIMULATION [SPACE]';btn.classList.add('paused');banner.classList.add('visible');sim.textContent='PAUSED';sim.style.color='#ffcc00';}
+    else{btn.textContent='⏸ PAUSE SIMULATION [SPACE]';btn.classList.remove('paused');banner.classList.remove('visible');sim.textContent='RUNNING';sim.style.color='#00ff00';}
 }
-document.addEventListener('keydown', e => {
-    if(e.code === 'Space' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') {
-        e.preventDefault();
-        togglePause();
-    }
-});
-document.getElementById('pauseBtn').addEventListener('click', togglePause);
+document.addEventListener('keydown',e=>{ if(e.code==='Space'&&e.target.tagName!=='INPUT'&&e.target.tagName!=='SELECT'){e.preventDefault();togglePause();} });
+document.getElementById('pauseBtn').addEventListener('click',togglePause);
 
 // ═══════════════════════════════════════════════
-//  UPDATE DYNAMIC THREATS
+//  UPDATE DYNAMIC
 // ═══════════════════════════════════════════════
 function updateDynamic() {
     if(paused) return;
     rs.threats.forEach(th=>{
         if(th.motionMode!=='dynamic') return;
-        th.t+=th.velocity*th.tDir;
-        if(th.t>=1){th.t=1;th.tDir=-1;}
-        if(th.t<=0){th.t=0;th.tDir=1;}
+        if(th.trajectory==='c_hook' && th._following){
+            const divergePx=(th.divergeRange||60)*(MAX_R/MAX_KM);
+            const sp=polarToXY(th.startBearing,th.startRange);
+            const dxIn=CX-sp.x,dyIn=CY-sp.y,distIn=Math.sqrt(dxIn*dxIn+dyIn*dyIn)||1;
+            const ux=dxIn/distIn,uy=dyIn/distIn,px2=-uy,py2=ux;
+            const arcCx=CX+px2*divergePx,arcCy=CY+py2*divergePx;
+            th._pos={x:arcCx+ux*divergePx,y:arcCy+uy*divergePx};
+            th.trail.push({x:th._pos.x,y:th._pos.y});
+            if(th.trail.length>70)th.trail.shift();
+            return;
+        }
+        th.t+=th.velocity;
+        if(th.t>=1){
+            if(th.trajectory==='c_hook'){th.t=1;th._following=true;}
+            else{th.t=0;th.trail=[];th._pos=null;}
+        }
         th._pos=getPosition(th,th.t);
         th.trail.push({x:th._pos.x,y:th._pos.y});
         if(th.trail.length>70)th.trail.shift();
     });
-    // Cool down detected flag
-    rs.threats.forEach(th => {
-        if(th.detectedTimer > 0) th.detectedTimer--;
-        if(th.detectedTimer <= 0) th.detected = false;
-    });
+    rs.threats.forEach(th=>{ if(th.detectedTimer>0)th.detectedTimer--; if(th.detectedTimer<=0)th.detected=false; });
 }
 
 // ═══════════════════════════════════════════════
-//  SWEEP DETECTION
+//  SWEEP
 // ═══════════════════════════════════════════════
 function updateSweep() {
-    if(!rs.sweep.active || paused) return;
-    const sw = rs.sweep;
-    const speedDeg = sw.speed * 0.6;
-    sw.angle = (sw.angle + speedDeg) % 360;
-
-    // Check all threats for intersection with sweep beam
-    const sweepRad = sw.angle;
-    const halfW = sw.width / 2;
-
-    rs.threats.forEach(th => {
-        let tx, ty;
-        if(th.motionMode === 'dynamic' && th._pos) {
-            tx = th._pos.x; ty = th._pos.y;
-        } else {
-            const pos = polarToXY(th.scanDirection, th.range);
-            tx = pos.x; ty = pos.y;
-        }
-        const dx = tx - CX, dy = ty - CY;
-        const dist = Math.sqrt(dx*dx + dy*dy);
-        const km = dist / PX_PER_KM;
-        if(km > sw.range) return;
-
-        // Angle of threat from center (0=north, clockwise)
-        let tAngle = (Math.atan2(dy, dx) * 180 / Math.PI + 90 + 360) % 360;
-        // Angular diff from sweep angle
-        let diff = ((tAngle - sweepRad + 540) % 360) - 180;
-        if(Math.abs(diff) < halfW) {
-            th.detected = true;
-            th.detectedTimer = 80;
-        }
+    if(!rs.sweep.active||paused) return;
+    const sw=rs.sweep, speedDeg=sw.speed*0.6;
+    sw.angle=(sw.angle+speedDeg)%360;
+    const half=sw.width/2;
+    rs.threats.forEach(th=>{
+        let tx,ty;
+        if(th.motionMode==='dynamic'&&th._pos){tx=th._pos.x;ty=th._pos.y;}
+        else{const pos=polarToXY(th.scanDirection,th.range);tx=pos.x;ty=pos.y;}
+        const dx=tx-CX,dy=ty-CY,dist=Math.sqrt(dx*dx+dy*dy),km=dist/PX_PER_KM;
+        if(km>sw.range)return;
+        let tAngle=((Math.atan2(dy,dx)*180/Math.PI+90+360)%360);
+        let diff=((tAngle-sw.angle+540)%360)-180;
+        if(Math.abs(diff)<half){th.detected=true;th.detectedTimer=80;}
     });
 }
 
-// ═══════════════════════════════════════════════
-//  DRAW SWEEP
-// ═══════════════════════════════════════════════
 function drawSweep() {
-    const sw = rs.sweep;
-    if(!sw.active) return;
-    const sweepR = kmToPx(sw.range);
-    const baseAngle = deg2rad(sw.angle - 90);
-    const halfW = deg2rad(sw.width / 2);
-
-    // Sweep wedge gradient
-    const grad = ctx.createConicalGradient ? null : null;
-    // Use arc fill for sweep wedge
+    const sw=rs.sweep; if(!sw.active) return;
+    const sweepR=kmToPx(sw.range),baseAngle=deg2rad(sw.angle-90),halfW=deg2rad(sw.width/2);
     ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(CX, CY);
-    ctx.arc(CX, CY, sweepR, baseAngle - halfW, baseAngle);
-    ctx.closePath();
-
-    const grd = ctx.createLinearGradient(CX, CY,
-        CX + Math.cos(baseAngle) * sweepR,
-        CY + Math.sin(baseAngle) * sweepR);
-    grd.addColorStop(0, 'rgba(0,255,136,0.02)');
-    grd.addColorStop(0.7, 'rgba(0,255,136,0.15)');
-    grd.addColorStop(1, 'rgba(0,255,136,0.35)');
-    ctx.fillStyle = grd;
-    ctx.fill();
-
-    // Leading edge bright line
-    ctx.beginPath();
-    ctx.moveTo(CX, CY);
-    ctx.lineTo(CX + Math.cos(baseAngle)*sweepR, CY + Math.sin(baseAngle)*sweepR);
-    ctx.strokeStyle = 'rgba(0,255,136,0.85)';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Trailing fade wedge
-    ctx.beginPath();
-    ctx.moveTo(CX, CY);
-    ctx.arc(CX, CY, sweepR, baseAngle - halfW * 3, baseAngle - halfW);
-    ctx.closePath();
-    const grd2 = ctx.createLinearGradient(CX, CY,
-        CX + Math.cos(baseAngle - halfW*2)*sweepR,
-        CY + Math.sin(baseAngle - halfW*2)*sweepR);
-    grd2.addColorStop(0, 'rgba(0,255,136,0)');
-    grd2.addColorStop(1, 'rgba(0,255,136,0.07)');
-    ctx.fillStyle = grd2;
-    ctx.fill();
-
-    // Sweep range ring
-    ctx.beginPath();
-    ctx.arc(CX, CY, sweepR, 0, Math.PI*2);
-    ctx.strokeStyle = 'rgba(0,255,136,0.18)';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([4,6]);
-    ctx.stroke();
-    ctx.setLineDash([]);
+    ctx.beginPath();ctx.moveTo(CX,CY);ctx.arc(CX,CY,sweepR,baseAngle-halfW,baseAngle);ctx.closePath();
+    const grd=ctx.createLinearGradient(CX,CY,CX+Math.cos(baseAngle)*sweepR,CY+Math.sin(baseAngle)*sweepR);
+    grd.addColorStop(0,'rgba(0,255,136,0.02)');grd.addColorStop(0.7,'rgba(0,255,136,0.15)');grd.addColorStop(1,'rgba(0,255,136,0.35)');
+    ctx.fillStyle=grd;ctx.fill();
+    ctx.beginPath();ctx.moveTo(CX,CY);ctx.lineTo(CX+Math.cos(baseAngle)*sweepR,CY+Math.sin(baseAngle)*sweepR);
+    ctx.strokeStyle='rgba(0,255,136,0.85)';ctx.lineWidth=2;ctx.stroke();
+    ctx.beginPath();ctx.moveTo(CX,CY);ctx.arc(CX,CY,sweepR,baseAngle-halfW*3,baseAngle-halfW);ctx.closePath();
+    const grd2=ctx.createLinearGradient(CX,CY,CX+Math.cos(baseAngle-halfW*2)*sweepR,CY+Math.sin(baseAngle-halfW*2)*sweepR);
+    grd2.addColorStop(0,'rgba(0,255,136,0)');grd2.addColorStop(1,'rgba(0,255,136,0.07)');
+    ctx.fillStyle=grd2;ctx.fill();
+    ctx.beginPath();ctx.arc(CX,CY,sweepR,0,Math.PI*2);
+    ctx.strokeStyle='rgba(0,255,136,0.18)';ctx.lineWidth=1;ctx.setLineDash([4,6]);ctx.stroke();ctx.setLineDash([]);
     ctx.restore();
 }
 
 // ═══════════════════════════════════════════════
-//  DRAW GHOST PATH
+//  GHOST / TRAIL / SECTOR / SYMBOL
 // ═══════════════════════════════════════════════
 function drawGhost(th) {
     if(th.motionMode!=='dynamic') return;
-    const pts=buildPath(th,80);
-    const {r,g,b}=hexRGB(th.color);
-    ctx.save();
-    ctx.setLineDash([3,6]);
-    ctx.strokeStyle=`rgba(${r},${g},${b},0.22)`;
-    ctx.lineWidth=1;
-    ctx.beginPath();
-    pts.forEach((p,i)=>i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y));
-    ctx.stroke();
-    ctx.setLineDash([]);
+    const pts=buildPath(th,80);const {r,g,b}=hexRGB(th.color);
+    ctx.save();ctx.setLineDash([3,6]);ctx.strokeStyle=`rgba(${r},${g},${b},0.22)`;ctx.lineWidth=1;
+    ctx.beginPath();pts.forEach((p,i)=>i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y));ctx.stroke();ctx.setLineDash([]);
     const prog=getPosition(th,th.t);
-    ctx.strokeStyle=`rgba(${r},${g},${b},0.5)`;
-    ctx.lineWidth=0.5;
-    ctx.beginPath(); ctx.arc(prog.x,prog.y,14,0,Math.PI*2); ctx.stroke();
+    ctx.strokeStyle=`rgba(${r},${g},${b},0.5)`;ctx.lineWidth=0.5;
+    ctx.beginPath();ctx.arc(prog.x,prog.y,14,0,Math.PI*2);ctx.stroke();
     const sp=polarToXY(th.startBearing,th.startRange);
-    ctx.fillStyle='rgba(255,170,0,0.9)';
-    ctx.beginPath(); ctx.arc(sp.x,sp.y,4,0,Math.PI*2); ctx.fill();
-    ctx.strokeStyle='#ffaa00'; ctx.lineWidth=1.5;
-    ctx.beginPath(); ctx.arc(sp.x,sp.y,8,0,Math.PI*2); ctx.stroke();
-    ctx.fillStyle='#ffaa00'; ctx.font='bold 9px Courier New';
-    ctx.fillText('S',sp.x-3,sp.y+3);
+    ctx.fillStyle='rgba(255,170,0,0.9)';ctx.beginPath();ctx.arc(sp.x,sp.y,4,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='#ffaa00';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(sp.x,sp.y,8,0,Math.PI*2);ctx.stroke();
+    ctx.fillStyle='#ffaa00';ctx.font='bold 9px Courier New';ctx.fillText('S',sp.x-3,sp.y+3);
     const ep=polarToXY(th.endBearing,th.endRange);
-    ctx.fillStyle='rgba(255,50,50,0.9)';
-    ctx.fillRect(ep.x-4,ep.y-4,8,8);
-    ctx.strokeStyle='#ff4444'; ctx.lineWidth=1.5;
-    ctx.strokeRect(ep.x-7,ep.y-7,14,14);
-    ctx.fillStyle='#ff4444'; ctx.font='bold 9px Courier New';
-    ctx.fillText('E',ep.x-3,ep.y+3);
+    ctx.fillStyle='rgba(255,50,50,0.9)';ctx.fillRect(ep.x-4,ep.y-4,8,8);
+    ctx.strokeStyle='#ff4444';ctx.lineWidth=1.5;ctx.strokeRect(ep.x-7,ep.y-7,14,14);
+    ctx.fillStyle='#ff4444';ctx.font='bold 9px Courier New';ctx.fillText('E',ep.x-3,ep.y+3);
     ctx.restore();
 }
-
-// ═══════════════════════════════════════════════
-//  DRAW TRAIL
-// ═══════════════════════════════════════════════
 function drawTrail(th) {
     if(th.motionMode!=='dynamic'||th.trail.length<2) return;
     const {r,g,b}=hexRGB(th.color);
     for(let j=1;j<th.trail.length;j++){
         const a=(j/th.trail.length)*0.65;
-        ctx.strokeStyle=`rgba(${r},${g},${b},${a})`;
-        ctx.lineWidth=1.5;
-        ctx.beginPath();
-        ctx.moveTo(th.trail[j-1].x,th.trail[j-1].y);
-        ctx.lineTo(th.trail[j  ].x,th.trail[j  ].y);
-        ctx.stroke();
+        ctx.strokeStyle=`rgba(${r},${g},${b},${a})`;ctx.lineWidth=1.5;
+        ctx.beginPath();ctx.moveTo(th.trail[j-1].x,th.trail[j-1].y);ctx.lineTo(th.trail[j].x,th.trail[j].y);ctx.stroke();
     }
 }
-
-// ═══════════════════════════════════════════════
-//  DRAW SECTOR  (dynamic mode → auto-computed bounds)
-// ═══════════════════════════════════════════════
 function drawSector(th) {
-    let scanDir, scanAng, range;
-    if(th.motionMode === 'dynamic') {
-        const bounds = computeDynamicScanFromPath(th);
-        scanDir = bounds.scanDirection;
-        scanAng = bounds.scanAngle;
-        range   = bounds.range;
-    } else {
-        scanDir = th.scanDirection;
-        scanAng = th.scanAngle;
-        range   = th.range;
-    }
-
-    const selR=kmToPx(range);
-    const sA=deg2rad(scanDir-scanAng-90);
-    const eA=deg2rad(scanDir+scanAng-90);
+    let scanDir,scanAng,range;
+    if(th.motionMode==='dynamic'){const bounds=computeDynamicScanFromPath(th);scanDir=bounds.scanDirection;scanAng=bounds.scanAngle;range=bounds.range;}
+    else{scanDir=th.scanDirection;scanAng=th.scanAngle;range=th.range;}
+    const selR=kmToPx(range),sA=deg2rad(scanDir-scanAng-90),eA=deg2rad(scanDir+scanAng-90);
     const {r,g,b}=hexRGB(th.color);
-    ctx.fillStyle=`rgba(${r},${g},${b},0.06)`;
-    ctx.strokeStyle=th.color; ctx.lineWidth=1.5;
-    ctx.beginPath(); ctx.moveTo(CX,CY); ctx.arc(CX,CY,selR,sA,eA);
-    ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.setLineDash([5,5]); ctx.beginPath(); ctx.arc(CX,CY,selR,sA,eA); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle=`rgba(${r},${g},${b},0.06)`;ctx.strokeStyle=th.color;ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(CX,CY);ctx.arc(CX,CY,selR,sA,eA);ctx.closePath();ctx.fill();ctx.stroke();
+    ctx.setLineDash([5,5]);ctx.beginPath();ctx.arc(CX,CY,selR,sA,eA);ctx.stroke();ctx.setLineDash([]);
     if(th.numPages>1){
-        ctx.strokeStyle=`rgba(${r},${g},${b},0.25)`; ctx.lineWidth=1; ctx.setLineDash([3,3]);
-        for(let p=1;p<th.numPages;p++){
-            ctx.beginPath(); ctx.arc(CX,CY,selR*(p/th.numPages),sA,eA); ctx.stroke();
-        }
-        ctx.setLineDash([]);
+        ctx.strokeStyle=`rgba(${r},${g},${b},0.25)`;ctx.lineWidth=1;ctx.setLineDash([3,3]);
+        for(let p=1;p<th.numPages;p++){ctx.beginPath();ctx.arc(CX,CY,selR*(p/th.numPages),sA,eA);ctx.stroke();}ctx.setLineDash([]);
     }
-    ctx.strokeStyle=th.color; ctx.lineWidth=1.5;
-    [scanDir-scanAng, scanDir+scanAng].forEach(a=>{
-        const rad=deg2rad(a-90);
-        ctx.beginPath(); ctx.moveTo(CX,CY);
-        ctx.lineTo(CX+Math.cos(rad)*selR,CY+Math.sin(rad)*selR); ctx.stroke();
-    });
-    const ca=deg2rad(scanDir-90);
-    ctx.setLineDash([8,4]); ctx.beginPath(); ctx.moveTo(CX,CY);
-    ctx.lineTo(CX+Math.cos(ca)*selR*0.7,CY+Math.sin(ca)*selR*0.7); ctx.stroke();
-    ctx.setLineDash([]);
+    ctx.strokeStyle=th.color;ctx.lineWidth=1.5;
+    [scanDir-scanAng,scanDir+scanAng].forEach(a=>{const rad=deg2rad(a-90);ctx.beginPath();ctx.moveTo(CX,CY);ctx.lineTo(CX+Math.cos(rad)*selR,CY+Math.sin(rad)*selR);ctx.stroke();});
+    const ca=deg2rad(scanDir-90);ctx.setLineDash([8,4]);ctx.beginPath();ctx.moveTo(CX,CY);ctx.lineTo(CX+Math.cos(ca)*selR*0.7,CY+Math.sin(ca)*selR*0.7);ctx.stroke();ctx.setLineDash([]);
 }
-
-// ═══════════════════════════════════════════════
-//  DRAW THREAT SYMBOL
-// ═══════════════════════════════════════════════
 function drawSymbol(th) {
-    let sx, sy, rotation=0;
-    if(th.motionMode==='dynamic' && th._pos){
-        sx=th._pos.x; sy=th._pos.y;
+    let sx,sy,rotation=0;
+    if(th.motionMode==='dynamic'&&th._pos){
+        sx=th._pos.x;sy=th._pos.y;
         if(th.trail.length>=3){
-            const prev=th.trail[Math.max(0,th.trail.length-5)];
-            const curr=th.trail[th.trail.length-1];
-            const dx=curr.x-prev.x, dy=curr.y-prev.y;
-            if(Math.abs(dx)+Math.abs(dy)>0.2) rotation=Math.atan2(dy,dx)+Math.PI/2;
+            const prev=th.trail[Math.max(0,th.trail.length-5)],curr=th.trail[th.trail.length-1];
+            const dx=curr.x-prev.x,dy=curr.y-prev.y;
+            if(Math.abs(dx)+Math.abs(dy)>0.2)rotation=Math.atan2(dy,dx)+Math.PI/2;
         }
-    } else {
-        const pos=polarToXY(th.scanDirection,th.range);
-        sx=pos.x; sy=pos.y;
+    } else { const pos=polarToXY(th.scanDirection,th.range);sx=pos.x;sy=pos.y; }
+    const {r,g,b}=hexRGB(th.color);const type=th.threatType||'search';
+    ctx.save();ctx.translate(sx,sy);if(rotation!==0)ctx.rotate(rotation);
+    if(th.detected&&th.detectedTimer>0){
+        const pulse=Math.sin(Date.now()*.05)*.5+.5;
+        const detGrd=ctx.createRadialGradient(0,0,0,0,0,32);
+        detGrd.addColorStop(0,`rgba(255,255,0,${0.6*pulse})`);detGrd.addColorStop(1,'rgba(255,255,0,0)');
+        ctx.fillStyle=detGrd;ctx.beginPath();ctx.arc(0,0,32,0,Math.PI*2);ctx.fill();
+        ctx.strokeStyle=`rgba(255,255,0,${0.8*pulse})`;ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,22,0,Math.PI*2);ctx.stroke();
     }
-
-    const {r,g,b}=hexRGB(th.color);
-    const type = th.threatType || 'search';
-
-    ctx.save();
-    ctx.translate(sx,sy);
-    if(rotation!==0) ctx.rotate(rotation);
-
-    // Detection pulse glow
-    if(th.detected && th.detectedTimer > 0) {
-        const pulse = Math.sin(Date.now() * 0.05) * 0.5 + 0.5;
-        const detGrd = ctx.createRadialGradient(0,0,0,0,0,32);
-        detGrd.addColorStop(0, `rgba(255,255,0,${0.6*pulse})`);
-        detGrd.addColorStop(1, 'rgba(255,255,0,0)');
-        ctx.fillStyle = detGrd; ctx.beginPath(); ctx.arc(0,0,32,0,Math.PI*2); ctx.fill();
-        ctx.strokeStyle = `rgba(255,255,0,${0.8*pulse})`;
-        ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0,0,22,0,Math.PI*2); ctx.stroke();
-    }
-
-    // Glow halo
     const grd=ctx.createRadialGradient(0,0,0,0,0,22);
-    grd.addColorStop(0,`rgba(${r},${g},${b},0.55)`);
-    grd.addColorStop(1,`rgba(${r},${g},${b},0)`);
-    ctx.fillStyle=grd; ctx.beginPath(); ctx.arc(0,0,22,0,Math.PI*2); ctx.fill();
-
-    ctx.fillStyle=th.color; ctx.strokeStyle='#ffffff'; ctx.lineWidth=1.8;
-
+    grd.addColorStop(0,`rgba(${r},${g},${b},0.55)`);grd.addColorStop(1,`rgba(${r},${g},${b},0)`);
+    ctx.fillStyle=grd;ctx.beginPath();ctx.arc(0,0,22,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle=th.color;ctx.strokeStyle='#ffffff';ctx.lineWidth=1.8;
     switch(type){
-        case 'search':
-            ctx.fillRect(-9,-9,18,18); ctx.strokeRect(-9,-9,18,18);
-            break;
-        case 'track':
-            ctx.beginPath(); ctx.moveTo(0,-12); ctx.lineTo(-9,9); ctx.lineTo(9,9);
-            ctx.closePath(); ctx.fill(); ctx.stroke();
-            break;
-        case 'trackWhileScan':
-            ctx.beginPath(); ctx.moveTo(0,-12); ctx.lineTo(12,0); ctx.lineTo(0,12); ctx.lineTo(-12,0);
-            ctx.closePath(); ctx.fill(); ctx.stroke();
-            break;
-        case 'acquisition':
-            for(let a=0;a<8;a++){
-                const rad=deg2rad(a*45);
-                ctx.strokeStyle=th.color; ctx.lineWidth=2.5;
-                ctx.beginPath(); ctx.moveTo(Math.cos(rad)*4,Math.sin(rad)*4);
-                ctx.lineTo(Math.cos(rad)*13,Math.sin(rad)*13); ctx.stroke();
-            }
-            ctx.fillStyle=th.color; ctx.strokeStyle='#fff'; ctx.lineWidth=1.5;
-            ctx.beginPath(); ctx.arc(0,0,5,0,Math.PI*2); ctx.fill(); ctx.stroke();
-            break;
-        case 'missile':
-            ctx.strokeStyle='#fff'; ctx.lineWidth=1.5;
-            ctx.beginPath(); ctx.moveTo(0,-14); ctx.lineTo(4,-4); ctx.lineTo(-4,-4); ctx.closePath();
-            ctx.fill(); ctx.stroke();
-            ctx.fillRect(-4,-4,8,14);
-            ctx.strokeRect(-4,-4,8,14);
-            ctx.beginPath(); ctx.moveTo(-4,5); ctx.lineTo(-10,14); ctx.lineTo(-4,10); ctx.closePath(); ctx.fill(); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(4,5);  ctx.lineTo(10,14);  ctx.lineTo(4,10);  ctx.closePath(); ctx.fill(); ctx.stroke();
-            ctx.fillStyle='#ffff00';
-            ctx.beginPath(); ctx.arc(0,11,3,0,Math.PI*2); ctx.fill();
-            break;
-        case 'unknown':
-            ctx.beginPath();
-            for(let a=0;a<6;a++){
-                const rad=deg2rad(a*60-30);
-                a===0?ctx.moveTo(Math.cos(rad)*11,Math.sin(rad)*11)
-                     :ctx.lineTo(Math.cos(rad)*11,Math.sin(rad)*11);
-            }
-            ctx.closePath(); ctx.fill(); ctx.stroke();
-            ctx.fillStyle='#fff'; ctx.font='bold 10px Courier New';
-            ctx.textAlign='center'; ctx.textBaseline='middle';
-            ctx.fillText('?',0,1);
-            break;
+        case'search': ctx.fillRect(-9,-9,18,18);ctx.strokeRect(-9,-9,18,18);break;
+        case'track': ctx.beginPath();ctx.moveTo(0,-12);ctx.lineTo(-9,9);ctx.lineTo(9,9);ctx.closePath();ctx.fill();ctx.stroke();break;
+        case'trackWhileScan': ctx.beginPath();ctx.moveTo(0,-12);ctx.lineTo(12,0);ctx.lineTo(0,12);ctx.lineTo(-12,0);ctx.closePath();ctx.fill();ctx.stroke();break;
+        case'acquisition': for(let a=0;a<8;a++){const rad=deg2rad(a*45);ctx.strokeStyle=th.color;ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(Math.cos(rad)*4,Math.sin(rad)*4);ctx.lineTo(Math.cos(rad)*13,Math.sin(rad)*13);ctx.stroke();}ctx.fillStyle=th.color;ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(0,0,5,0,Math.PI*2);ctx.fill();ctx.stroke();break;
+        case'missile': ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(0,-14);ctx.lineTo(4,-4);ctx.lineTo(-4,-4);ctx.closePath();ctx.fill();ctx.stroke();ctx.fillRect(-4,-4,8,14);ctx.strokeRect(-4,-4,8,14);ctx.beginPath();ctx.moveTo(-4,5);ctx.lineTo(-10,14);ctx.lineTo(-4,10);ctx.closePath();ctx.fill();ctx.stroke();ctx.beginPath();ctx.moveTo(4,5);ctx.lineTo(10,14);ctx.lineTo(4,10);ctx.closePath();ctx.fill();ctx.stroke();ctx.fillStyle='#ffff00';ctx.beginPath();ctx.arc(0,11,3,0,Math.PI*2);ctx.fill();break;
+        case'unknown': ctx.beginPath();for(let a=0;a<6;a++){const rad=deg2rad(a*60-30);a===0?ctx.moveTo(Math.cos(rad)*11,Math.sin(rad)*11):ctx.lineTo(Math.cos(rad)*11,Math.sin(rad)*11);}ctx.closePath();ctx.fill();ctx.stroke();ctx.fillStyle='#fff';ctx.font='bold 10px Courier New';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('?',0,1);break;
     }
     ctx.restore();
-
-    // Label
-    ctx.save();
-    ctx.fillStyle='#fff'; ctx.font='bold 10px Courier New';
-    ctx.fillText('T'+th.id, sx+16, sy-6);
-    if(th.detected && th.detectedTimer > 0) {
-        ctx.fillStyle='#ffff00'; ctx.font='bold 9px Courier New';
-        ctx.fillText('⚡DET', sx+16, sy+4);
-    } else if(th.motionMode==='dynamic'){
-        const sn={straight:'STR',scurve:'S〜S',inbound_parabolic:'I⌒P',outbound_parabolic:'O⌣P'};
-        ctx.fillStyle='#00ffaa'; ctx.font='8px Courier New';
-        ctx.fillText(sn[th.trajectory]||'DYN', sx+16, sy+4);
-        const {r,g,b}=hexRGB(th.color);
-        const barW=22;
-        ctx.fillStyle=`rgba(${r},${g},${b},0.7)`;
-        ctx.fillRect(sx+16, sy+7, th.t*barW, 2);
-        ctx.strokeStyle='#333'; ctx.lineWidth=0.5;
-        ctx.strokeRect(sx+16, sy+7, barW, 2);
+    ctx.save();ctx.fillStyle='#fff';ctx.font='bold 10px Courier New';ctx.fillText('T'+th.id,sx+16,sy-6);
+    if(th.detected&&th.detectedTimer>0){ctx.fillStyle='#ffff00';ctx.font='bold 9px Courier New';ctx.fillText('⚡DET',sx+16,sy+4);}
+    else if(th.motionMode==='dynamic'){
+        const sn={straight:'STR',scurve:'S〜S',inbound_parabolic:'I⌒P',outbound_parabolic:'O⌣P',c_hook:'↩CHK'};
+        ctx.fillStyle='#00ffaa';ctx.font='8px Courier New';ctx.fillText(sn[th.trajectory]||'DYN',sx+16,sy+4);
+        const {r,g,b}=hexRGB(th.color);ctx.fillStyle=`rgba(${r},${g},${b},0.7)`;
+        ctx.fillRect(sx+16,sy+7,th.t*22,2);ctx.strokeStyle='#333';ctx.lineWidth=0.5;ctx.strokeRect(sx+16,sy+7,22,2);
     }
     ctx.restore();
 }
 
 // ═══════════════════════════════════════════════
-//  FRIENDLY AIRCRAFT
+//  SU-30MKI AIRCRAFT — twin-engine flanker top-down
 // ═══════════════════════════════════════════════
 function drawAircraft() {
-    ctx.save(); ctx.translate(CX,CY);
-    ctx.fillStyle='#00ddff'; ctx.strokeStyle='#00ffff'; ctx.lineWidth=1.5;
-    ctx.beginPath(); ctx.moveTo(0,-22); ctx.lineTo(-3,12); ctx.lineTo(3,12);
-    ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(-18,0); ctx.lineTo(18,0); ctx.lineTo(14,7); ctx.lineTo(-14,7);
-    ctx.closePath(); ctx.fill(); ctx.stroke();
-    [[-7,9,-10,18,-4,18],[7,9,10,18,4,18]].forEach(([x1,y1,x2,y2,x3,y3])=>{
-        ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.lineTo(x3,y3);
-        ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.save();ctx.translate(CX,CY);
+    ctx.fillStyle='#00ddff';ctx.strokeStyle='#00ffff';ctx.lineWidth=1.4;
+    // Fuselage — long needle body
+    ctx.beginPath();ctx.moveTo(0,-22);ctx.lineTo(-2.5,11);ctx.lineTo(2.5,11);ctx.closePath();ctx.fill();ctx.stroke();
+    // Main swept wings
+    ctx.beginPath();ctx.moveTo(-16,0);ctx.lineTo(16,0);ctx.lineTo(12,8);ctx.lineTo(-12,8);ctx.closePath();ctx.fill();ctx.stroke();
+    // Tail fins (left & right)
+    [[-6,7,-9,16,-4,16],[6,7,9,16,4,16]].forEach(([x1,y1,x2,y2,x3,y3])=>{
+        ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.lineTo(x3,y3);ctx.closePath();ctx.fill();ctx.stroke();
     });
-    ctx.fillStyle='#ff0000'; ctx.beginPath(); ctx.arc(0,0,3,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle='#00ddff'; ctx.font='bold 10px Courier New';
-    ctx.fillText('LHPD',-55,4); ctx.fillText('RHPD',30,4);
+    // Twin engine nozzles
+    ctx.fillStyle='#0088aa';
+    ctx.beginPath();ctx.arc(-4,13,2.5,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc( 4,13,2.5,0,Math.PI*2);ctx.fill();
+    // Cockpit dot
+    ctx.fillStyle='#ff0000';ctx.beginPath();ctx.arc(0,-10,2.5,0,Math.PI*2);ctx.fill();
     ctx.restore();
 }
 
@@ -951,263 +1057,466 @@ function drawAircraft() {
 function scrambleEnemy(){
     const e=rs.enemy;
     if(e.active&&e.phase!=='standby'&&e.phase!=='done') return;
-    e.entryAngle  =+document.getElementById('enemyEntryAngle').value;
-    e.dropRange   =+document.getElementById('enemyDropRange').value;
+    e.entryAngle=+document.getElementById('enemyEntryAngle').value;
+    e.dropRange=+document.getElementById('enemyDropRange').value;
     e.ingressSpeed=+document.getElementById('enemyIngressSpeed').value;
-    e.egressSpeed =+document.getElementById('enemyEgressSpeed').value;
+    e.egressSpeed=+document.getElementById('enemyEgressSpeed').value;
     e.missileSpeed=+document.getElementById('enemyMissileSpeed').value;
     e.missileCount=+document.getElementById('enemyMissileCount').value;
     e.active=true;e.phase='ingress';e.progress=0;e.trail=[];e.missiles=[];e.flashTimer=0;
-    const sp=polarToXY(e.entryAngle,MAX_KM+15);
-    e.x=sp.x;e.y=sp.y;e.angle=e.entryAngle+180;
+    const sp=polarToXY(e.entryAngle,MAX_KM+15);e.x=sp.x;e.y=sp.y;e.angle=e.entryAngle+180;
     document.getElementById('scrambleBtn').classList.add('active-mission');
     document.getElementById('scrambleBtn').textContent='⚡ MISSION ACTIVE';
     updateDisplay();
 }
-function abortEnemy(){
-    const e=rs.enemy;
-    e.active=false;e.phase='standby';e.progress=0;e.trail=[];e.missiles=[];
-    resetScrambleBtn();updateDisplay();
-}
-function resetScrambleBtn(){
-    const b=document.getElementById('scrambleBtn');
-    b.classList.remove('active-mission');b.textContent='⚠ SCRAMBLE ENEMY';b.disabled=false;
-}
+function abortEnemy(){ const e=rs.enemy;e.active=false;e.phase='standby';e.progress=0;e.trail=[];e.missiles=[];resetScrambleBtn();updateDisplay(); }
+function resetScrambleBtn(){ const b=document.getElementById('scrambleBtn');b.classList.remove('active-mission');b.textContent='⚠ SCRAMBLE ENEMY';b.disabled=false; }
 function updateEnemy(){
-    const e=rs.enemy;
-    if(!e.active||e.phase==='standby'||e.phase==='done') return;
+    const e=rs.enemy;if(!e.active||e.phase==='standby'||e.phase==='done') return;
     if(paused) return;
     const SK=MAX_KM+15;
-    if(e.phase==='ingress'){
-        e.progress=Math.min(1,e.progress+e.ingressSpeed*0.002);
-        const p=polarToXY(e.entryAngle,SK+(e.dropRange-SK)*e.progress);
-        e.x=p.x;e.y=p.y;e.angle=e.entryAngle+180;
-        e.trail.push({x:e.x,y:e.y});if(e.trail.length>60)e.trail.shift();
-        if(e.progress>=1){e.phase='drop';e.progress=0;spawnMissiles();}
-    }else if(e.phase==='drop'){
-        e.progress+=0.015;e.flashTimer++;
-        if(e.progress>=1){e.phase='egress';e.progress=0;e.angle=e.entryAngle;}
-    }else if(e.phase==='egress'){
-        e.progress=Math.min(1,e.progress+e.egressSpeed*0.002);
-        const p=polarToXY(e.entryAngle,e.dropRange+(SK-e.dropRange)*e.progress);
-        e.x=p.x;e.y=p.y;e.angle=e.entryAngle;
-        e.trail.push({x:e.x,y:e.y});if(e.trail.length>60)e.trail.shift();
-        if(e.progress>=1){
-            e.phase='done';e.active=false;e.trail=[];
-            setTimeout(()=>{resetScrambleBtn();updateDisplay();},1500);
-        }
-    }
-    e.missiles.forEach(m=>{
-        if(m.done)return;
-        m.progress=Math.min(1,m.progress+e.missileSpeed*0.003);
-        m.cx=m.sx+(m.tx-m.sx)*m.progress;m.cy=m.sy+(m.ty-m.sy)*m.progress;
-        m.trail.push({x:m.cx,y:m.cy});if(m.trail.length>35)m.trail.shift();
-        if(m.progress>=1){m.done=true;m.flash=15;}
-    });
+    if(e.phase==='ingress'){ e.progress=Math.min(1,e.progress+e.ingressSpeed*.002);const p=polarToXY(e.entryAngle,SK+(e.dropRange-SK)*e.progress);e.x=p.x;e.y=p.y;e.angle=e.entryAngle+180;e.trail.push({x:e.x,y:e.y});if(e.trail.length>60)e.trail.shift();if(e.progress>=1){e.phase='drop';e.progress=0;spawnMissiles();} }
+    else if(e.phase==='drop'){ e.progress+=.015;e.flashTimer++;if(e.progress>=1){e.phase='egress';e.progress=0;e.angle=e.entryAngle;} }
+    else if(e.phase==='egress'){ e.progress=Math.min(1,e.progress+e.egressSpeed*.002);const p=polarToXY(e.entryAngle,e.dropRange+(SK-e.dropRange)*e.progress);e.x=p.x;e.y=p.y;e.angle=e.entryAngle;e.trail.push({x:e.x,y:e.y});if(e.trail.length>60)e.trail.shift();if(e.progress>=1){e.phase='done';e.active=false;e.trail=[];setTimeout(()=>{resetScrambleBtn();updateDisplay();},1500);} }
+    e.missiles.forEach(m=>{ if(m.done)return;m.progress=Math.min(1,m.progress+e.missileSpeed*.003);m.cx=m.sx+(m.tx-m.sx)*m.progress;m.cy=m.sy+(m.ty-m.sy)*m.progress;m.trail.push({x:m.cx,y:m.cy});if(m.trail.length>35)m.trail.shift();if(m.progress>=1){m.done=true;m.flash=15;} });
     updateDisplay();
 }
-function spawnMissiles(){
-    const e=rs.enemy;const sp=[-20,0,20,-10];
-    for(let i=0;i<e.missileCount;i++){
-        const tp=polarToXY(sp[i%4],5);
-        e.missiles.push({sx:e.x,sy:e.y,tx:tp.x,ty:tp.y,cx:e.x,cy:e.y,progress:0,trail:[],done:false,flash:0,id:i+1});
-    }
-}
+function spawnMissiles(){ const e=rs.enemy,sp=[-20,0,20,-10];for(let i=0;i<e.missileCount;i++){const tp=polarToXY(sp[i%4],5);e.missiles.push({sx:e.x,sy:e.y,tx:tp.x,ty:tp.y,cx:e.x,cy:e.y,progress:0,trail:[],done:false,flash:0,id:i+1});} }
 function drawEnemy(){
-    const e=rs.enemy;
-    if(!e.active&&e.phase==='standby')return;
-    if(e.phase==='done')return;
-    if(e.trail.length>1){
-        for(let j=1;j<e.trail.length;j++){
-            ctx.strokeStyle=`rgba(255,0,68,${(j/e.trail.length)*0.5})`;ctx.lineWidth=1.5;
-            ctx.beginPath();ctx.moveTo(e.trail[j-1].x,e.trail[j-1].y);ctx.lineTo(e.trail[j].x,e.trail[j].y);ctx.stroke();
-        }
-    }
+    const e=rs.enemy;if(!e.active&&e.phase==='standby')return;if(e.phase==='done')return;
+    if(e.trail.length>1){for(let j=1;j<e.trail.length;j++){ctx.strokeStyle=`rgba(255,0,68,${(j/e.trail.length)*.5})`;ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(e.trail[j-1].x,e.trail[j-1].y);ctx.lineTo(e.trail[j].x,e.trail[j].y);ctx.stroke();}}
     e.missiles.forEach(drawMissile);
     if(e.x<-50||e.x>canvas.width+50||e.y<-50||e.y>canvas.height+50)return;
     ctx.save();ctx.translate(e.x,e.y);ctx.rotate(deg2rad(e.angle-90)+Math.PI/2);
     const isD=e.phase==='drop',bl=isD?(e.flashTimer%8<4):true;
     if(bl){
-        const g=ctx.createRadialGradient(0,0,0,0,0,20);
-        g.addColorStop(0,'rgba(255,0,68,0.4)');g.addColorStop(1,'rgba(255,0,68,0)');
-        ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,20,0,Math.PI*2);ctx.fill();
+        const g=ctx.createRadialGradient(0,0,0,0,0,20);g.addColorStop(0,'rgba(255,0,68,0.4)');g.addColorStop(1,'rgba(255,0,68,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,20,0,Math.PI*2);ctx.fill();
         ctx.fillStyle='#ff0044';ctx.strokeStyle='#ff3366';ctx.lineWidth=1.5;
         ctx.beginPath();ctx.moveTo(0,-22);ctx.lineTo(-3,12);ctx.lineTo(3,12);ctx.closePath();ctx.fill();ctx.stroke();
         ctx.beginPath();ctx.moveTo(-20,2);ctx.lineTo(20,2);ctx.lineTo(15,10);ctx.lineTo(-15,10);ctx.closePath();ctx.fill();ctx.stroke();
-        [[-7,9,-11,18,-4,18],[7,9,11,18,4,18]].forEach(([x1,y1,x2,y2,x3,y3])=>{
-            ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.lineTo(x3,y3);ctx.closePath();ctx.fill();ctx.stroke();
-        });
+        [[-7,9,-11,18,-4,18],[7,9,11,18,4,18]].forEach(([x1,y1,x2,y2,x3,y3])=>{ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.lineTo(x3,y3);ctx.closePath();ctx.fill();ctx.stroke();});
         ctx.fillStyle='#ffff00';ctx.beginPath();ctx.arc(0,0,3,0,Math.PI*2);ctx.fill();
     }
     ctx.restore();
-    ctx.save();
-    ctx.fillStyle='#ff3366';ctx.font='bold 11px Courier New';ctx.fillText('BOGEY',e.x+14,e.y-14);
-    const pc={ingress:'#ff8888',drop:'#ffff00',egress:'#88ff88'};
-    ctx.fillStyle=pc[e.phase]||'#ff3366';ctx.font='9px Courier New';ctx.fillText(e.phase.toUpperCase(),e.x+14,e.y-4);
-    ctx.restore();
-    if(isD&&e.flashTimer%8<4){
-        ctx.strokeStyle='rgba(255,255,0,0.6)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(e.x,e.y,22,0,Math.PI*2);ctx.stroke();
-        ctx.strokeStyle='rgba(255,0,68,0.4)';ctx.lineWidth=1;ctx.beginPath();ctx.arc(e.x,e.y,32,0,Math.PI*2);ctx.stroke();
-    }
+    ctx.save();ctx.fillStyle='#ff3366';ctx.font='bold 11px Courier New';ctx.fillText('BOGEY',e.x+14,e.y-14);
+    const pc={ingress:'#ff8888',drop:'#ffff00',egress:'#88ff88'};ctx.fillStyle=pc[e.phase]||'#ff3366';ctx.font='9px Courier New';ctx.fillText(e.phase.toUpperCase(),e.x+14,e.y-4);ctx.restore();
+    if(isD&&e.flashTimer%8<4){ctx.strokeStyle='rgba(255,255,0,0.6)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(e.x,e.y,22,0,Math.PI*2);ctx.stroke();ctx.strokeStyle='rgba(255,0,68,0.4)';ctx.lineWidth=1;ctx.beginPath();ctx.arc(e.x,e.y,32,0,Math.PI*2);ctx.stroke();}
 }
 function drawMissile(m){
-    if(m.trail.length>1){
-        for(let j=1;j<m.trail.length;j++){
-            ctx.strokeStyle=`rgba(255,80,0,${(j/m.trail.length)*0.8})`;ctx.lineWidth=1.5;
-            ctx.beginPath();ctx.moveTo(m.trail[j-1].x,m.trail[j-1].y);ctx.lineTo(m.trail[j].x,m.trail[j].y);ctx.stroke();
-        }
-    }
-    if(m.done){
-        if(m.flash>0){
-            m.flash--;
-            const r=(15-m.flash)*4,a=m.flash/15;
-            const g=ctx.createRadialGradient(m.tx,m.ty,0,m.tx,m.ty,r);
-            g.addColorStop(0,`rgba(255,200,0,${a})`);g.addColorStop(0.5,`rgba(255,80,0,${a*0.6})`);g.addColorStop(1,`rgba(255,0,0,0)`);
-            ctx.fillStyle=g;ctx.beginPath();ctx.arc(m.tx,m.ty,r,0,Math.PI*2);ctx.fill();
-        }
-        return;
-    }
-    const g=ctx.createRadialGradient(m.cx,m.cy,0,m.cx,m.cy,10);
-    g.addColorStop(0,'rgba(255,80,0,1)');g.addColorStop(1,'rgba(255,80,0,0)');
-    ctx.fillStyle=g;ctx.beginPath();ctx.arc(m.cx,m.cy,10,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='#ff5000';ctx.beginPath();ctx.arc(m.cx,m.cy,3.5,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='#ff8844';ctx.font='bold 10px Courier New';ctx.fillText(`EM${m.id}`,m.cx+7,m.cy-5);
+    if(m.trail.length>1){for(let j=1;j<m.trail.length;j++){ctx.strokeStyle=`rgba(255,80,0,${(j/m.trail.length)*.8})`;ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(m.trail[j-1].x,m.trail[j-1].y);ctx.lineTo(m.trail[j].x,m.trail[j].y);ctx.stroke();}}
+    if(m.done){if(m.flash>0){m.flash--;const r=(15-m.flash)*4,a=m.flash/15,g=ctx.createRadialGradient(m.tx,m.ty,0,m.tx,m.ty,r);g.addColorStop(0,`rgba(255,200,0,${a})`);g.addColorStop(.5,`rgba(255,80,0,${a*.6})`);g.addColorStop(1,'rgba(255,0,0,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(m.tx,m.ty,r,0,Math.PI*2);ctx.fill();}return;}
+    const g=ctx.createRadialGradient(m.cx,m.cy,0,m.cx,m.cy,10);g.addColorStop(0,'rgba(255,80,0,1)');g.addColorStop(1,'rgba(255,80,0,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(m.cx,m.cy,10,0,Math.PI*2);ctx.fill();ctx.fillStyle='#ff5000';ctx.beginPath();ctx.arc(m.cx,m.cy,3.5,0,Math.PI*2);ctx.fill();ctx.fillStyle='#ff8844';ctx.font='bold 10px Courier New';ctx.fillText(`EM${m.id}`,m.cx+7,m.cy-5);
 }
 function drawEnemyAlert(){
-    const e=rs.enemy;
-    const am=e.missiles.filter(m=>!m.done&&m.progress>0.1);
-    if(!am.length)return;
-    if(Math.floor(Date.now()/400)%2===0){
-        ctx.save();ctx.fillStyle='rgba(255,0,68,0.9)';ctx.font='bold 14px Courier New';
-        ctx.fillText('⚠ MISSILE INBOUND',CX+60,30);ctx.restore();
-    }
-    am.forEach(m=>{
-        ctx.strokeStyle='rgba(255,80,0,0.2)';ctx.lineWidth=1;ctx.setLineDash([3,6]);
-        ctx.beginPath();ctx.moveTo(m.cx,m.cy);ctx.lineTo(m.tx,m.ty);ctx.stroke();ctx.setLineDash([]);
-    });
+    const e=rs.enemy;const am=e.missiles.filter(m=>!m.done&&m.progress>.1);if(!am.length)return;
+    if(Math.floor(Date.now()/400)%2===0){ctx.save();ctx.fillStyle='rgba(255,0,68,0.9)';ctx.font='bold 14px Courier New';ctx.fillText('⚠ MISSILE INBOUND',CX+60,30);ctx.restore();}
+    am.forEach(m=>{ctx.strokeStyle='rgba(255,80,0,0.2)';ctx.lineWidth=1;ctx.setLineDash([3,6]);ctx.beginPath();ctx.moveTo(m.cx,m.cy);ctx.lineTo(m.tx,m.ty);ctx.stroke();ctx.setLineDash([]);});
 }
 
 // ═══════════════════════════════════════════════
-//  MAIN DRAW LOOP
+//  DRAW RADAR
 // ═══════════════════════════════════════════════
 function drawRadar(){
     ctx.fillStyle='#050814';ctx.fillRect(0,0,canvas.width,canvas.height);
-
-    ctx.fillStyle='rgba(0,255,0,0.07)';ctx.beginPath();ctx.moveTo(CX,CY);
-    ctx.arc(CX,CY,MAX_R,deg2rad(45-90),deg2rad(225-90));ctx.closePath();ctx.fill();
-    ctx.fillStyle='rgba(100,200,255,0.07)';ctx.beginPath();ctx.moveTo(CX,CY);
-    ctx.arc(CX,CY,MAX_R,deg2rad(225-90),deg2rad(405-90));ctx.closePath();ctx.fill();
-
-    ctx.strokeStyle='rgba(150,150,150,0.25)';ctx.lineWidth=1.5;ctx.setLineDash([5,5]);
-    [[45],[225]].forEach(([a])=>{
-        const r=deg2rad(a-90);ctx.beginPath();ctx.moveTo(CX,CY);
-        ctx.lineTo(CX+Math.cos(r)*MAX_R,CY+Math.sin(r)*MAX_R);ctx.stroke();
-    });
-    ctx.setLineDash([]);
-
+    ctx.strokeStyle='#1a3a52';ctx.lineWidth=2;ctx.strokeRect(1,1,canvas.width-2,canvas.height-2);
+    // Su-30MKI style: right half green (45° to -135°), left half darker
+    ctx.fillStyle='rgba(0,255,0,0.06)';ctx.beginPath();ctx.moveTo(CX,CY);ctx.arc(CX,CY,MAX_R,deg2rad(45-90),deg2rad(225-90));ctx.closePath();ctx.fill();
+    ctx.fillStyle='rgba(100,200,255,0.04)';ctx.beginPath();ctx.moveTo(CX,CY);ctx.arc(CX,CY,MAX_R,deg2rad(225-90),deg2rad(405-90));ctx.closePath();ctx.fill();
     for(let i=1;i<=10;i++){
-        const r=kmToPx(i*20);ctx.strokeStyle='#1a3a52';ctx.lineWidth=1;
+        const r=kmToPx(i*20);
+        ctx.strokeStyle='#1a3a52';ctx.lineWidth=1;
         ctx.beginPath();ctx.arc(CX,CY,r,0,Math.PI*2);ctx.stroke();
-        ctx.fillStyle='#4a6a82';ctx.font='11px Courier New';ctx.fillText(i*20+'km',CX+5,CY-r+5);
+        if(i%2===0){ctx.fillStyle='#3a5a72';ctx.font='9px Courier New';ctx.fillText(i*20+'km',CX+4,CY-r+12);}
     }
-
-    const dirs=[[0,'0°',0,-18],[45,'45°',5,-10],[90,'90°',10,5],[135,'135°',5,15],
-        [180,'±180°',-22,20],[-135,'-135°',-42,15],[-90,'-90°',-42,5],[-45,'-45°',-42,-10]];
-    ctx.strokeStyle='#1a3a52';ctx.lineWidth=1;ctx.fillStyle='#00ddff';ctx.font='bold 13px Courier New';
+    const dirs=[[0,'0°',0,-18],[45,'45°',6,-8],[90,'90°',10,5],[135,'135°',6,16],[180,'180°',-20,20],[-135,'-135°',-44,16],[-90,'-90°',-46,5],[-45,'-45°',-44,-8]];
     dirs.forEach(([deg,label,dx,dy])=>{
-        const a=deg2rad(deg-90);
+        const a=deg2rad(deg-90);ctx.strokeStyle='#1a3a52';ctx.lineWidth=.8;ctx.setLineDash([]);
         ctx.beginPath();ctx.moveTo(CX,CY);ctx.lineTo(CX+Math.cos(a)*MAX_R,CY+Math.sin(a)*MAX_R);ctx.stroke();
-        ctx.fillText(label,CX+Math.cos(a)*(MAX_R+10)+dx,CY+Math.sin(a)*(MAX_R+10)+dy);
+        ctx.fillStyle='#00ddff';ctx.font='bold 12px Courier New';ctx.fillText(label,CX+Math.cos(a)*(MAX_R+14)+dx,CY+Math.sin(a)*(MAX_R+14)+dy);
     });
-
-    // Update and draw sweep
-    updateSweep();
-    drawSweep();
-
-    // Update then draw
-    updateDynamic();
-    rs.threats.forEach(drawGhost);
-    rs.threats.forEach(drawTrail);
-    rs.threats.forEach(drawSector);
-
-    updateEnemy();
-    drawEnemy();
-    drawEnemyAlert();
-
-    drawAircraft();
-    rs.threats.forEach(drawSymbol);
-
-    // Paused overlay
-    if(paused) {
-        ctx.save();
-        ctx.fillStyle = 'rgba(0,0,0,0.25)';
-        ctx.fillRect(0,0,canvas.width,canvas.height);
-        ctx.strokeStyle = 'rgba(255,200,0,0.5)';
-        ctx.lineWidth = 3;
-        ctx.setLineDash([10,10]);
-        ctx.strokeRect(3,3,canvas.width-6,canvas.height-6);
-        ctx.setLineDash([]);
-        ctx.restore();
-    }
+    ctx.save();ctx.beginPath();ctx.arc(CX,CY,MAX_R,0,Math.PI*2);ctx.clip();
+    updateSweep();drawSweep();updateDynamic();
+    rs.threats.forEach(drawGhost);rs.threats.forEach(drawTrail);rs.threats.forEach(drawSector);
+    updateEnemy();drawEnemy();drawEnemyAlert();drawAircraft();rs.threats.forEach(drawSymbol);
+    ctx.restore();
+    if(paused){ctx.save();ctx.fillStyle='rgba(0,0,0,0.25)';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.strokeStyle='rgba(255,200,0,0.5)';ctx.lineWidth=3;ctx.setLineDash([10,10]);ctx.strokeRect(3,3,canvas.width-6,canvas.height-6);ctx.setLineDash([]);ctx.restore();}
 }
 
-// ═══════════════════════════════════════════════
-//  DISPLAY UPDATE
-// ═══════════════════════════════════════════════
 function updateDisplay(){
     const ph={standby:'STANDBY',ingress:'INGRESS ►',drop:'DROP ⚠',egress:'EGRESS ◄',done:'RTB'};
     document.getElementById('activeThreatsCount').textContent=rs.numThreats;
-    document.getElementById('enemyStatusInfo').textContent   =ph[rs.enemy.phase]||'STANDBY';
-    document.getElementById('enemyPhaseDisplay').textContent =ph[rs.enemy.phase]||'STANDBY';
-    const det = rs.threats.filter(t=>t.detected).length;
-    document.getElementById('detectedCount').textContent = det;
-    document.getElementById('sweepStatusDisplay').textContent = rs.sweep.active ? 'ACTIVE ●' : 'OFF';
+    document.getElementById('enemyStatusInfo').textContent=ph[rs.enemy.phase]||'STANDBY';
+    document.getElementById('enemyPhaseDisplay').textContent=ph[rs.enemy.phase]||'STANDBY';
+    document.getElementById('detectedCount').textContent=rs.threats.filter(t=>t.detected).length;
+    document.getElementById('sweepStatusDisplay').textContent=rs.sweep.active?'ACTIVE ●':'OFF';
 }
 
 // ═══════════════════════════════════════════════
-//  SWEEP CONTROLS
+//  EVENT LISTENERS
 // ═══════════════════════════════════════════════
-document.getElementById('sweepToggleBtn').addEventListener('click', () => {
-    rs.sweep.active = !rs.sweep.active;
-    rs.sweep.speed = +document.getElementById('sweepSpeed').value;
-    rs.sweep.width = +document.getElementById('sweepWidth').value;
-    rs.sweep.range = +document.getElementById('sweepRange').value;
-    const btn = document.getElementById('sweepToggleBtn');
-    if(rs.sweep.active) {
-        btn.textContent = '📡 DEACTIVATE SWEEP';
-        btn.classList.add('active');
-    } else {
-        btn.textContent = '📡 ACTIVATE SWEEP';
-        btn.classList.remove('active');
-        rs.threats.forEach(t => { t.detected = false; t.detectedTimer = 0; });
-    }
+document.getElementById('sweepToggleBtn').addEventListener('click',()=>{
+    rs.sweep.active=!rs.sweep.active;
+    rs.sweep.speed=+document.getElementById('sweepSpeed').value;
+    rs.sweep.width=+document.getElementById('sweepWidth').value;
+    rs.sweep.range=+document.getElementById('sweepRange').value;
+    const btn=document.getElementById('sweepToggleBtn');
+    if(rs.sweep.active){btn.textContent='📡 DEACTIVATE SWEEP';btn.classList.add('active');}
+    else{btn.textContent='📡 ACTIVATE SWEEP';btn.classList.remove('active');rs.threats.forEach(t=>{t.detected=false;t.detectedTimer=0;});}
     updateDisplay();
 });
-
-// ═══════════════════════════════════════════════
-//  EVENTS
-// ═══════════════════════════════════════════════
 document.getElementById('numThreats').addEventListener('input',function(){
-    rs.numThreats=Math.max(1,Math.min(16,+this.value));this.value=rs.numThreats;
-    initThreats();createUI();updateDisplay();
+    rs.numThreats=Math.max(1,Math.min(16,+this.value));this.value=rs.numThreats;initThreats();createUI();updateDisplay();
 });
 document.getElementById('clearButton').addEventListener('click',function(){
-    rs.numThreats=1;
-    document.getElementById('numThreats').value=1;
-    initThreats();createUI();updateDisplay();
+    rs.numThreats=1;document.getElementById('numThreats').value=1;initThreats();createUI();updateDisplay();
 });
 document.getElementById('scrambleBtn').addEventListener('click',scrambleEnemy);
 document.getElementById('abortEnemyBtn').addEventListener('click',abortEnemy);
 
 // ═══════════════════════════════════════════════
-//  BOOT
+//  SCENARIOS
 // ═══════════════════════════════════════════════
-initThreats();createUI();updateDisplay();
+const BUILTIN_SCENARIOS = {
+    single_search:{name:'Single Search Emitter',desc:"A lone search radar at 11 o'clock, 120 km.",sweep:{active:true,speed:3,width:12,range:180},threats:[{id:1,threatType:'search',color:'#ff2200',motionMode:'static',scanDirection:-30,scanAngle:35,range:120,numPages:2,trajectory:'straight',startBearing:-30,startRange:120,endBearing:10,endRange:80,velocity:0.003,divergeRange:60}],enemy:null},
+    single_missile:{name:'Inbound Missile Threat',desc:'Single missile from 6 o\'clock, inbound parabolic.',sweep:{active:true,speed:5,width:18,range:200},threats:[{id:1,threatType:'missile',color:'#ff8800',motionMode:'dynamic',scanDirection:180,scanAngle:10,range:160,numPages:1,trajectory:'inbound_parabolic',startBearing:175,startRange:180,endBearing:180,endRange:8,velocity:0.006,divergeRange:60}],enemy:null},
+    pincer_attack:{name:'Pincer Attack',desc:'Two track radars converging from 10 and 2 o\'clock.',sweep:{active:true,speed:4,width:14,range:200},threats:[{id:1,threatType:'track',color:'#ffee00',motionMode:'dynamic',scanDirection:-60,scanAngle:20,range:130,numPages:1,trajectory:'inbound_parabolic',startBearing:-60,startRange:160,endBearing:-40,endRange:20,velocity:0.004,divergeRange:60},{id:2,threatType:'track',color:'#00ddff',motionMode:'dynamic',scanDirection:60,scanAngle:20,range:130,numPages:1,trajectory:'inbound_parabolic',startBearing:60,startRange:160,endBearing:40,endRange:20,velocity:0.004,divergeRange:60}],enemy:null},
+    sam_battery:{name:'SAM Battery',desc:'Acquisition radar then two missiles launch.',sweep:{active:true,speed:3,width:10,range:150},threats:[{id:1,threatType:'acquisition',color:'#ff00cc',motionMode:'static',scanDirection:90,scanAngle:55,range:80,numPages:2,trajectory:'straight',startBearing:90,startRange:80,endBearing:90,endRange:80,velocity:0.003,divergeRange:60},{id:2,threatType:'missile',color:'#ff4400',motionMode:'dynamic',scanDirection:85,scanAngle:10,range:60,numPages:1,trajectory:'inbound_parabolic',startBearing:82,startRange:78,endBearing:85,endRange:5,velocity:0.007,divergeRange:60},{id:3,threatType:'missile',color:'#ff6600',motionMode:'dynamic',scanDirection:95,scanAngle:10,range:60,numPages:1,trajectory:'inbound_parabolic',startBearing:98,startRange:78,endBearing:95,endRange:5,velocity:0.007,divergeRange:60}],enemy:null},
+    saturation:{name:'Saturation — 6 Mixed Emitters',desc:'6 different emitter types spread 360°.',sweep:{active:true,speed:2,width:8,range:200},threats:[{id:1,threatType:'search',color:'#ff2200',motionMode:'static',scanDirection:0,scanAngle:35,range:130,numPages:2,trajectory:'straight',startBearing:0,startRange:130,endBearing:40,endRange:90,velocity:0.003,divergeRange:60},{id:2,threatType:'track',color:'#ffee00',motionMode:'static',scanDirection:60,scanAngle:20,range:100,numPages:1,trajectory:'straight',startBearing:60,startRange:100,endBearing:80,endRange:60,velocity:0.004,divergeRange:60},{id:3,threatType:'trackWhileScan',color:'#00ff44',motionMode:'static',scanDirection:130,scanAngle:10,range:90,numPages:1,trajectory:'straight',startBearing:130,startRange:90,endBearing:150,endRange:50,velocity:0.003,divergeRange:60},{id:4,threatType:'acquisition',color:'#ff00cc',motionMode:'static',scanDirection:200,scanAngle:55,range:80,numPages:2,trajectory:'straight',startBearing:200,startRange:80,endBearing:200,endRange:80,velocity:0.003,divergeRange:60},{id:5,threatType:'missile',color:'#ff8800',motionMode:'static',scanDirection:280,scanAngle:10,range:60,numPages:1,trajectory:'straight',startBearing:280,startRange:60,endBearing:280,endRange:60,velocity:0.003,divergeRange:60},{id:6,threatType:'unknown',color:'#0088ff',motionMode:'static',scanDirection:340,scanAngle:180,range:50,numPages:1,trajectory:'straight',startBearing:340,startRange:50,endBearing:340,endRange:50,velocity:0.003,divergeRange:60}],enemy:null},
+    pop_up_threat:{name:'Pop-Up Threat (S-Curve)',desc:'TWS emitter, evasive S-curve ingress.',sweep:{active:true,speed:4,width:16,range:200},threats:[{id:1,threatType:'trackWhileScan',color:'#00ff44',motionMode:'dynamic',scanDirection:-135,scanAngle:10,range:150,numPages:1,trajectory:'scurve',startBearing:-130,startRange:180,endBearing:-100,endRange:15,velocity:0.003,divergeRange:60}],enemy:{active:true,entryAngle:-130,dropRange:40,ingressSpeed:4,egressSpeed:7,missileSpeed:6,missileCount:2}},
+    escort_jamming:{name:'Escort Formation',desc:'TWS escorts Search radar outbound.',sweep:{active:true,speed:3,width:14,range:200},threats:[{id:1,threatType:'search',color:'#ff2200',motionMode:'dynamic',scanDirection:45,scanAngle:30,range:120,numPages:2,trajectory:'outbound_parabolic',startBearing:30,startRange:60,endBearing:60,endRange:180,velocity:0.003,divergeRange:60},{id:2,threatType:'trackWhileScan',color:'#00ff44',motionMode:'dynamic',scanDirection:50,scanAngle:10,range:100,numPages:1,trajectory:'outbound_parabolic',startBearing:50,startRange:55,endBearing:65,endRange:175,velocity:0.003,divergeRange:60}],enemy:null},
+    cruise_missile_salvo:{name:'Cruise Missile Salvo',desc:'4 cruise missiles from 12 o\'clock staggered.',sweep:{active:true,speed:6,width:20,range:200},threats:[{id:1,threatType:'missile',color:'#ff8800',motionMode:'dynamic',scanDirection:-10,scanAngle:10,range:150,numPages:1,trajectory:'inbound_parabolic',startBearing:-12,startRange:190,endBearing:-8,endRange:6,velocity:0.005,divergeRange:60},{id:2,threatType:'missile',color:'#ffaa00',motionMode:'dynamic',scanDirection:5,scanAngle:10,range:150,numPages:1,trajectory:'inbound_parabolic',startBearing:3,startRange:190,endBearing:6,endRange:6,velocity:0.005,divergeRange:60},{id:3,threatType:'missile',color:'#ff6600',motionMode:'dynamic',scanDirection:-20,scanAngle:10,range:150,numPages:1,trajectory:'inbound_parabolic',startBearing:-22,startRange:185,endBearing:-15,endRange:6,velocity:0.005,divergeRange:60},{id:4,threatType:'missile',color:'#ff4400',motionMode:'dynamic',scanDirection:15,scanAngle:10,range:150,numPages:1,trajectory:'inbound_parabolic',startBearing:14,startRange:185,endBearing:18,endRange:6,velocity:0.005,divergeRange:60}],enemy:null},
+    ambush:{name:'Ambush — Multiple Arcs',desc:'3 threats + enemy aircraft ambush.',sweep:{active:true,speed:4,width:15,range:200},threats:[{id:1,threatType:'track',color:'#ffee00',motionMode:'dynamic',scanDirection:-90,scanAngle:20,range:140,numPages:1,trajectory:'inbound_parabolic',startBearing:-90,startRange:170,endBearing:-70,endRange:12,velocity:0.004,divergeRange:60},{id:2,threatType:'acquisition',color:'#ff00cc',motionMode:'dynamic',scanDirection:90,scanAngle:40,range:120,numPages:2,trajectory:'scurve',startBearing:100,startRange:160,endBearing:70,endRange:15,velocity:0.003,divergeRange:60},{id:3,threatType:'missile',color:'#ff4400',motionMode:'dynamic',scanDirection:175,scanAngle:10,range:150,numPages:1,trajectory:'straight',startBearing:175,startRange:185,endBearing:178,endRange:5,velocity:0.006,divergeRange:60}],enemy:{active:true,entryAngle:90,dropRange:50,ingressSpeed:5,egressSpeed:8,missileSpeed:7,missileCount:2}},
+    full_attack:{name:'Full Strike Package',desc:'Maximum threat density + enemy aircraft.',sweep:{active:true,speed:5,width:12,range:200},threats:[{id:1,threatType:'search',color:'#ff2200',motionMode:'static',scanDirection:-45,scanAngle:35,range:160,numPages:2,trajectory:'straight',startBearing:-45,startRange:160,endBearing:-20,endRange:100,velocity:0.003,divergeRange:60},{id:2,threatType:'trackWhileScan',color:'#00ff44',motionMode:'dynamic',scanDirection:120,scanAngle:10,range:110,numPages:1,trajectory:'scurve',startBearing:110,startRange:155,endBearing:130,endRange:20,velocity:0.003,divergeRange:60},{id:3,threatType:'acquisition',color:'#ff00cc',motionMode:'static',scanDirection:155,scanAngle:55,range:80,numPages:2,trajectory:'straight',startBearing:155,startRange:80,endBearing:155,endRange:80,velocity:0.003,divergeRange:60},{id:4,threatType:'missile',color:'#ff8800',motionMode:'dynamic',scanDirection:160,scanAngle:10,range:80,numPages:1,trajectory:'inbound_parabolic',startBearing:158,startRange:78,endBearing:162,endRange:5,velocity:0.006,divergeRange:60},{id:5,threatType:'unknown',color:'#0088ff',motionMode:'static',scanDirection:-160,scanAngle:180,range:55,numPages:1,trajectory:'straight',startBearing:-160,startRange:55,endBearing:-160,endRange:55,velocity:0.003,divergeRange:60}],enemy:{active:true,entryAngle:120,dropRange:55,ingressSpeed:5,egressSpeed:8,missileSpeed:7,missileCount:3}},
+    c_hook_tail:{name:'C-Hook Tail Chase (L+R)',desc:'Two tracks approach from 12 o\'clock, C-curve inward.',sweep:{active:true,speed:4,width:14,range:200},threats:[{id:1,threatType:'track',color:'#ffee00',motionMode:'dynamic',scanDirection:-20,scanAngle:20,range:140,numPages:1,trajectory:'c_hook',divergeRange:100,startBearing:-20,startRange:185,endBearing:-20,endRange:185,velocity:0.004},{id:2,threatType:'track',color:'#00ddff',motionMode:'dynamic',scanDirection:20,scanAngle:20,range:140,numPages:1,trajectory:'c_hook',divergeRange:100,startBearing:20,startRange:185,endBearing:20,endRange:185,velocity:0.004}],enemy:null},
+    cross_straight:{name:'Parallel Pass — Left & Right',desc:'Two missiles fly parallel, left and right lanes.',sweep:{active:true,speed:5,width:16,range:200},threats:[{id:1,threatType:'missile',color:'#ff4400',motionMode:'dynamic',scanDirection:-20,scanAngle:10,range:160,numPages:1,trajectory:'straight',startBearing:-20,startRange:185,endBearing:-160,endRange:185,velocity:0.004,divergeRange:60},{id:2,threatType:'missile',color:'#ff8800',motionMode:'dynamic',scanDirection:20,scanAngle:10,range:160,numPages:1,trajectory:'straight',startBearing:20,startRange:185,endBearing:160,endRange:185,velocity:0.004,divergeRange:60}],enemy:null}
+};
+
+function onScenarioChange(){
+    const key=document.getElementById('scenarioSelect').value;
+    const all=getAllScenarios(),sc=all[key];
+    document.getElementById('scenarioDesc').textContent=sc?(sc.desc||sc.description||''):'Select a scenario above.';
+    const isSaved=key&&!BUILTIN_SCENARIOS[key];
+    document.getElementById('btnDelSaved').style.display=isSaved?'inline-block':'none';
+}
+function runScenario(){
+    const key=document.getElementById('scenarioSelect').value;
+    if(!key){alert('Please select a scenario first.');return;}
+    const all=getAllScenarios(),sc=all[key];
+    if(!sc){alert('Scenario not found.');return;}
+    const sw=sc.sweep||{};
+    rs.sweep.active=sw.active||false;rs.sweep.speed=sw.speed||3;rs.sweep.width=sw.width||15;rs.sweep.range=sw.range||200;rs.sweep.angle=0;
+    document.getElementById('sweepSpeed').value=rs.sweep.speed;document.getElementById('sweepWidth').value=rs.sweep.width;document.getElementById('sweepRange').value=rs.sweep.range;
+    const sweepBtn=document.getElementById('sweepToggleBtn');
+    if(rs.sweep.active){sweepBtn.textContent='📡 DEACTIVATE SWEEP';sweepBtn.classList.add('active');}
+    else{sweepBtn.textContent='📡 ACTIVATE SWEEP';sweepBtn.classList.remove('active');}
+    const tpl=sc.threats||[];rs.numThreats=Math.max(1,tpl.length);document.getElementById('numThreats').value=rs.numThreats;
+    rs.threats=tpl.map((th,i)=>({...th,id:i+1,color:th.color||THREAT_COLORS[i%THREAT_COLORS.length],t:0,tDir:1,trail:[],_pos:null,_following:false,detected:false,detectedTimer:0,divergeRange:th.divergeRange||60,_prevDistM:null,_doppler:0,_dopplerHistory:[]}));
+    const en=sc.enemy;
+    if(en&&en.active){rs.enemy={active:false,phase:'standby',x:0,y:0,angle:0,trail:[],missiles:[],flashTimer:0,progress:0,entryAngle:en.entryAngle||135,dropRange:en.dropRange||60,ingressSpeed:en.ingressSpeed||4,egressSpeed:en.egressSpeed||7,missileSpeed:en.missileSpeed||6,missileCount:en.missileCount||2};document.getElementById('enemyEntryAngle').value=rs.enemy.entryAngle;document.getElementById('enemyDropRange').value=rs.enemy.dropRange;document.getElementById('enemyIngressSpeed').value=rs.enemy.ingressSpeed;document.getElementById('enemyEgressSpeed').value=rs.enemy.egressSpeed;document.getElementById('enemyMissileSpeed').value=rs.enemy.missileSpeed;document.getElementById('enemyMissileCount').value=rs.enemy.missileCount;}
+    else{rs.enemy={active:false,phase:'standby',x:0,y:0,angle:0,entryAngle:135,dropRange:60,ingressSpeed:4,egressSpeed:7,missileSpeed:6,missileCount:2,progress:0,trail:[],missiles:[],flashTimer:0};}
+    createUI();updateDisplay();
+}
+const LS_KEY='su30mki_saved_scenarios';
+function getSavedScenarios(){try{return JSON.parse(localStorage.getItem(LS_KEY)||'{}');}catch(e){return {};}}
+function getAllScenarios(){return{...BUILTIN_SCENARIOS,...getSavedScenarios()};}
+function saveCurrentScenario(){
+    const name=document.getElementById('saveNameInput').value.trim();
+    if(!name){alert('Enter a name for your scenario.');return;}
+    const key='saved_'+name.toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'');
+    const snapshot={name,desc:`Saved: ${name} — ${rs.numThreats} threat(s).`,sweep:{active:rs.sweep.active,speed:rs.sweep.speed,width:rs.sweep.width,range:rs.sweep.range},threats:rs.threats.map(th=>({id:th.id,threatType:th.threatType,color:th.color,motionMode:th.motionMode,scanDirection:th.scanDirection,scanAngle:th.scanAngle,range:th.range,numPages:th.numPages,trajectory:th.trajectory,divergeRange:th.divergeRange||60,startBearing:th.startBearing,startRange:th.startRange,endBearing:th.endBearing,endRange:th.endRange,velocity:th.velocity})),enemy:rs.enemy.active?{active:true,entryAngle:rs.enemy.entryAngle,dropRange:rs.enemy.dropRange,ingressSpeed:rs.enemy.ingressSpeed,egressSpeed:rs.enemy.egressSpeed,missileSpeed:rs.enemy.missileSpeed,missileCount:rs.enemy.missileCount}:null};
+    const saved=getSavedScenarios();saved[key]=snapshot;localStorage.setItem(LS_KEY,JSON.stringify(saved));
+    document.getElementById('saveNameInput').value='';refreshSavedOptions();document.getElementById('scenarioSelect').value=key;onScenarioChange();
+    alert(`✅ "${name}" saved!`);
+}
+function deleteSavedScenario(){
+    const key=document.getElementById('scenarioSelect').value;
+    if(!key||BUILTIN_SCENARIOS[key]){alert('Cannot delete a built-in scenario.');return;}
+    const saved=getSavedScenarios(),name=saved[key]?.name||key;
+    if(!confirm(`Delete saved scenario "${name}"?`))return;
+    delete saved[key];localStorage.setItem(LS_KEY,JSON.stringify(saved));
+    document.getElementById('scenarioSelect').value='';refreshSavedOptions();onScenarioChange();
+}
+function refreshSavedOptions(){
+    const grp=document.getElementById('savedOptGroup'),saved=getSavedScenarios();grp.innerHTML='';
+    Object.entries(saved).forEach(([key,sc])=>{const opt=document.createElement('option');opt.value=key;opt.textContent='💾 '+(sc.name||key);grp.appendChild(opt);});
+    grp.style.display=Object.keys(saved).length?'':'none';
+}
+refreshSavedOptions();
+
+// ═══════════════════════════════════════════════
+//  DOPPLER ENGINE
+// ═══════════════════════════════════════════════
+const C_LIGHT = 3e8;
+let selectedCase = 1;
+
+function selectCase(n){
+    selectedCase=n;
+    document.querySelectorAll('.dp-case-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelector(`[data-case="${n}"]`).classList.add('active');
+    const thetaRow=document.getElementById('dp_theta').closest('div').parentElement;
+    thetaRow.style.opacity=(n===3||n===6)?'1':'0.4';
+}
+selectCase(1);
+
+function computeDopplerCase(caseNum, fc, VT, VR, theta){
+    let Vrel, label;
+    switch(caseNum){
+        case 1: Vrel=VT+VR; label='Head-On (Approaching)'; break;
+        case 2: Vrel=VT-VR; label='Same Direction (Chasing)'; break;
+        case 3: Vrel=VT*Math.cos(theta*Math.PI/180); label='Perpendicular Motion'; break;
+        case 4: Vrel=-(VT+VR); label='Head-On Separating'; break;
+        case 5: Vrel=VR-VT; label='Radar Following Target'; break;
+        case 6: Vrel=VT*Math.cos(theta*Math.PI/180)-VR; label='Arbitrary Angle'; break;
+        default: Vrel=0; label='Unknown';
+    }
+    const fD=(2*fc*Vrel)/C_LIGHT, fr=fc+fD;
+    return{Vrel,fD,fr,label};
+}
+
+function runDopplerCalc(){
+    const fc_GHz=+document.getElementById('dp_fc').value;
+    const VT=+document.getElementById('dp_vt').value;
+    const VR=+document.getElementById('dp_vr').value;
+    const theta=+document.getElementById('dp_theta').value;
+    const fc=fc_GHz*1e9;
+    const btn=document.getElementById('dpRunBtn');btn.classList.add('computing');
+    setTimeout(()=>{
+        const res=computeDopplerCase(selectedCase,fc,VT,VR,theta);
+        setResultBox('res_vrel',res.Vrel.toFixed(2),'m/s',res.Vrel>0?'positive':res.Vrel<0?'negative':'neutral');
+        setResultBox('res_fd',fmtHz(res.fD),'',res.fD>0?'positive':res.fD<0?'negative':'neutral');
+        setResultBox('res_fr',(res.fr/1e9).toFixed(6),'GHz','neutral');
+        setResultBox('res_case',`CASE ${selectedCase}`,'',res.Vrel>0?'positive':res.Vrel<0?'negative':'neutral');
+        drawSingleWaveform('waveCanvas',fc,res.fr,res.fD,CASE_COLORS[selectedCase-1],`Case ${selectedCase}: ${res.label}`);
+        drawAllWaveforms(fc_GHz,VT,VR,theta);
+        btn.classList.remove('computing');
+    },50);
+}
+
+function setResultBox(id,val,unit,cls){
+    const box=document.getElementById(id);
+    box.querySelector('.drb-val').textContent=val;
+    if(unit)box.querySelector('.drb-unit').textContent=unit;
+    box.className='dp-result-box '+cls;
+}
+
+function fmtHz(hz){
+    const a=Math.abs(hz);
+    if(a>=1e6)return(hz/1e6).toFixed(3)+' MHz';
+    if(a>=1e3)return(hz/1e3).toFixed(2)+' kHz';
+    return hz.toFixed(1)+' Hz';
+}
+
+const CASE_COLORS=['#00ff88','#ffee00','#00ddff','#ff4466','#ff8800','#cc88ff'];
+const CASE_NAMES=['Head-On Approach','Same Dir Chase','Perp Motion','Head-On Separate','Radar Following','Arbitrary Angle'];
+
+function drawSingleWaveform(canvasId,fc,fr,fD,color,title){
+    const cvs=document.getElementById(canvasId);if(!cvs)return;
+    const w=cvs.clientWidth||cvs.width,h=cvs.height||80;cvs.width=w;cvs.height=h;
+    const cx2=cvs.getContext('2d');
+    cx2.fillStyle='#02030a';cx2.fillRect(0,0,w,h);
+    cx2.strokeStyle='rgba(40,20,80,0.6)';cx2.lineWidth=0.5;
+    for(let i=1;i<4;i++){cx2.beginPath();cx2.moveTo(0,h*i/4);cx2.lineTo(w,h*i/4);cx2.stroke();}
+    for(let i=1;i<8;i++){cx2.beginPath();cx2.moveTo(w*i/8,0);cx2.lineTo(w*i/8,h);cx2.stroke();}
+    cx2.strokeStyle='rgba(100,60,150,0.4)';cx2.lineWidth=1;cx2.beginPath();cx2.moveTo(0,h/2);cx2.lineTo(w,h/2);cx2.stroke();
+    const tScale=Math.max(1e-8,Math.abs(fr)>0?5/fr:1e-6);
+    cx2.strokeStyle=color;cx2.lineWidth=1.5;cx2.beginPath();
+    const amp=h*.38;
+    for(let px=0;px<w;px++){const t=(px/w)*tScale,y=h/2-amp*Math.cos(2*Math.PI*fr*t);px===0?cx2.moveTo(px,Math.max(2,Math.min(h-2,y))):cx2.lineTo(px,Math.max(2,Math.min(h-2,y)));}
+    cx2.stroke();
+    cx2.fillStyle=color;cx2.font='7px Courier New';cx2.fillText(`fD=${fmtHz(fD)}`,4,10);
+    cx2.fillStyle='rgba(150,100,200,0.7)';cx2.font='7px Courier New';cx2.fillText(title||'',4,h-5);
+}
+
+function drawAllWaveforms(fc_GHz,VT,VR,theta){
+    const container=document.getElementById('allWaveforms');container.innerHTML='';
+    for(let c=1;c<=6;c++){
+        const res=computeDopplerCase(c,fc_GHz*1e9,VT,VR,theta);
+        const wrap=document.createElement('div');wrap.className='waveform-item';
+        const lbl=document.createElement('div');lbl.className='waveform-label';lbl.style.color=CASE_COLORS[c-1];lbl.textContent=`C${c}: ${CASE_NAMES[c-1]}`;
+        const cvs=document.createElement('canvas');cvs.height=55;cvs.style.width='100%';cvs.style.display='block';
+        wrap.appendChild(lbl);wrap.appendChild(cvs);container.appendChild(wrap);
+        setTimeout(()=>{
+            cvs.width=cvs.clientWidth||200;cvs.height=55;
+            const cx2=cvs.getContext('2d');
+            cx2.fillStyle='#02030a';cx2.fillRect(0,0,cvs.width,55);
+            cx2.strokeStyle='rgba(40,20,80,0.5)';cx2.lineWidth=0.5;
+            for(let i=1;i<3;i++){cx2.beginPath();cx2.moveTo(0,55*i/3);cx2.lineTo(cvs.width,55*i/3);cx2.stroke();}
+            cx2.strokeStyle='rgba(80,40,120,0.3)';cx2.lineWidth=1;cx2.beginPath();cx2.moveTo(0,27.5);cx2.lineTo(cvs.width,27.5);cx2.stroke();
+            const tS=Math.max(1e-8,Math.abs(res.fr)>0?4/res.fr:1e-6);
+            cx2.strokeStyle=CASE_COLORS[c-1];cx2.lineWidth=1.4;cx2.beginPath();
+            const amp2=55*.37;
+            for(let px=0;px<cvs.width;px++){const t=(px/cvs.width)*tS,y=27.5-amp2*Math.cos(2*Math.PI*res.fr*t);px===0?cx2.moveTo(px,Math.max(1,Math.min(54,y))):cx2.lineTo(px,Math.max(1,Math.min(54,y)));}
+            cx2.stroke();
+            cx2.fillStyle=CASE_COLORS[c-1];cx2.font='7px Courier New';cx2.fillText(`fD=${fmtHz(res.fD)}`,3,9);
+        },10+c*5);
+    }
+}
+
+function runDopplerVsTime(){
+    const fc_GHz=+document.getElementById('dp_fc').value;
+    const fc=fc_GHz*1e9;
+    const v=+document.getElementById('dvt_v').value;
+    const theta=+document.getElementById('dvt_theta').value;
+    const x0=+document.getElementById('dvt_x0').value;
+    const y0=+document.getElementById('dvt_y0').value;
+    const dt=+document.getElementById('dvt_dt').value;
+    const Tmax=+document.getElementById('dvt_tmax').value;
+    const Vx=v*Math.cos(theta*Math.PI/180),Vy=v*Math.sin(theta*Math.PI/180);
+    let X=x0,Y=y0,initial_distance=Math.sqrt(X*X+Y*Y);
+    const num_steps=Math.ceil(Tmax/dt),doppler_array=[],time_array=[];
+    for(let k=0;k<num_steps;k++){
+        X+=Vx*dt;Y+=Vy*dt;
+        const new_distance=Math.sqrt(X*X+Y*Y),radial_velocity=(initial_distance-new_distance)/dt;
+        doppler_array.push((2*fc*radial_velocity)/C_LIGHT);time_array.push(k*dt);initial_distance=new_distance;
+    }
+    plotDopplerVsTime(time_array,doppler_array,fc_GHz,v,theta);
+    const maxFd=Math.max(...doppler_array.map(Math.abs)),avgFd=doppler_array.reduce((a,b)=>a+b,0)/doppler_array.length;
+    document.getElementById('dvtStats').innerHTML=`<span style="color:#cc88ff">Steps: ${num_steps}</span> &nbsp;|&nbsp; <span style="color:#00ff88">Max|fD|: ${fmtHz(maxFd)}</span> &nbsp;|&nbsp; <span style="color:#ffcc00">Avg fD: ${fmtHz(avgFd)}</span> &nbsp;|&nbsp; <span style="color:#00ddff">fc: ${fc_GHz} GHz &nbsp; v: ${v} m/s &nbsp; θ: ${theta}°</span>`;
+}
+
+function plotDopplerVsTime(times,freqs,fc_GHz,v,theta){
+    const cvs=document.getElementById('dvtCanvas');
+    const W=cvs.clientWidth||400;cvs.width=W;const H=cvs.height||130;
+    const cx2=cvs.getContext('2d');
+    cx2.fillStyle='#02030a';cx2.fillRect(0,0,W,H);
+    cx2.strokeStyle='rgba(40,20,80,0.5)';cx2.lineWidth=0.5;
+    for(let i=1;i<5;i++){cx2.beginPath();cx2.moveTo(0,H*i/5);cx2.lineTo(W,H*i/5);cx2.stroke();}
+    for(let i=1;i<8;i++){cx2.beginPath();cx2.moveTo(W*i/8,0);cx2.lineTo(W*i/8,H);cx2.stroke();}
+    const minF=Math.min(...freqs),maxF=Math.max(...freqs),rng=maxF-minF||1;
+    cx2.fillStyle='#553377';cx2.font='7px Courier New';cx2.fillText(fmtHz(maxF),2,9);cx2.fillText(fmtHz(minF),2,H-3);
+    const zeroY=H-((0-minF)/rng)*H;
+    cx2.strokeStyle='rgba(100,60,150,0.4)';cx2.lineWidth=1;cx2.beginPath();cx2.moveTo(0,Math.max(0,Math.min(H,zeroY)));cx2.lineTo(W,Math.max(0,Math.min(H,zeroY)));cx2.stroke();
+    cx2.strokeStyle='#cc88ff';cx2.lineWidth=2;cx2.beginPath();
+    freqs.forEach((f,i)=>{const px=(i/freqs.length)*W,py=H-((f-minF)/rng)*H;i===0?cx2.moveTo(px,py):cx2.lineTo(px,Math.max(1,Math.min(H-1,py)));});
+    cx2.stroke();
+    cx2.fillStyle='rgba(200,136,255,0.6)';cx2.font='8px Courier New';cx2.fillText(`Doppler vs Time  |  fc=${fc_GHz}GHz  v=${v}m/s  θ=${theta}°`,4,H-3);
+    cx2.fillStyle='#553377';cx2.font='7px Courier New';cx2.fillText('Time (s)',W-50,H-3);cx2.fillText('0',2,H-8);
+    if(times.length>0)cx2.fillText(times[times.length-1].toFixed(1)+'s',W-30,H-8);
+}
+
+// ── LIVE DOPPLER ──
+const LIVE_HISTORY_LEN = 200;
+
+function computeLiveDoppler(){
+    if(paused) return;
+    const fc_GHz=+document.getElementById('liveFC').value, fc=fc_GHz*1e9;
+    rs.threats.forEach(th=>{
+        let currentKm;
+        if(th.motionMode==='dynamic'&&th._pos){
+            const dx=th._pos.x-CX,dy=th._pos.y-CY;currentKm=Math.sqrt(dx*dx+dy*dy)/PX_PER_KM;
+        } else { currentKm=th.range; }
+        const currentM=currentKm*1000;
+        if(th._prevDistM!==undefined&&th._prevDistM!==null){
+            const radialVel=(th._prevDistM-currentM)/0.016;
+            const fD=(2*fc*radialVel)/C_LIGHT;
+            th._doppler=fD;
+            if(!th._dopplerHistory)th._dopplerHistory=[];
+            th._dopplerHistory.push(fD);
+            if(th._dopplerHistory.length>LIVE_HISTORY_LEN)th._dopplerHistory.shift();
+        }
+        th._prevDistM=currentM;
+    });
+}
+
+function renderLiveDoppler(){
+    const list=document.getElementById('liveDopplerList');
+    if(!rs.threats.length){list.innerHTML='<div style="color:#2a1a52;font-size:9px;text-align:center;padding:8px;">No active threats</div>';return;}
+    list.innerHTML=rs.threats.map(th=>{
+        const fd=th._doppler||0;
+        const cls=fd>50?'dli-approach':fd<-50?'dli-recede':'dli-perp';
+        const arrow=fd>50?'▼ APPROACH':fd<-50?'▲ RECEDE':'→ PERPENDICULAR';
+        const km=th.motionMode==='dynamic'&&th._pos?(Math.sqrt((th._pos.x-CX)**2+(th._pos.y-CY)**2)/PX_PER_KM).toFixed(1):th.range.toFixed(1);
+        return`<div class="dp-live-item" style="border-left-color:${th.color}">
+            <div class="dli-head"><span class="dli-id" style="color:${th.color}">T${th.id} — ${th.threatType.toUpperCase()}</span><span class="dli-fd ${cls}">${fmtHz(fd)}</span></div>
+            <div class="dli-sub"><span class="${cls}">${arrow}</span> &nbsp;|&nbsp; Range: ${km} km &nbsp;|&nbsp; Mode: ${th.motionMode.toUpperCase()}</div>
+        </div>`;
+    }).join('');
+    drawLiveTimeline();
+    const leg=document.getElementById('timelineLegend');
+    leg.innerHTML=rs.threats.map(th=>`<div class="dp-tl-leg-item"><div class="dp-tl-leg-dot" style="background:${th.color}"></div>T${th.id}</div>`).join('');
+}
+
+function drawLiveTimeline(){
+    const cvs=document.getElementById('liveTimelineCanvas');
+    const W=cvs.clientWidth||400;cvs.width=W;const H=cvs.height||100;
+    const cx2=cvs.getContext('2d');
+    cx2.fillStyle='#02030a';cx2.fillRect(0,0,W,H);
+    cx2.strokeStyle='rgba(40,20,80,0.4)';cx2.lineWidth=0.5;
+    for(let i=1;i<4;i++){cx2.beginPath();cx2.moveTo(0,H*i/4);cx2.lineTo(W,H*i/4);cx2.stroke();}
+    cx2.strokeStyle='rgba(80,40,120,0.35)';cx2.lineWidth=1;cx2.beginPath();cx2.moveTo(0,H/2);cx2.lineTo(W,H/2);cx2.stroke();
+    const allVals=rs.threats.flatMap(th=>th._dopplerHistory||[]);
+    if(!allVals.length){cx2.fillStyle='#2a1a52';cx2.font='9px Courier New';cx2.fillText('WAITING FOR DYNAMIC THREATS...',W/2-90,H/2);return;}
+    const mn=Math.min(...allVals),mx=Math.max(...allVals),rng=mx-mn||1;
+    rs.threats.forEach(th=>{
+        if(!th._dopplerHistory||th._dopplerHistory.length<2)return;
+        const hist=th._dopplerHistory;
+        cx2.strokeStyle=th.color;cx2.lineWidth=1.4;cx2.beginPath();
+        hist.forEach((f,i)=>{const px=(i/LIVE_HISTORY_LEN)*W,py=H-((f-mn)/rng)*H;i===0?cx2.moveTo(px,Math.max(1,Math.min(H-1,py))):cx2.lineTo(px,Math.max(1,Math.min(H-1,py)));});
+        cx2.stroke();
+    });
+    cx2.fillStyle='#553377';cx2.font='7px Courier New';cx2.fillText(fmtHz(mx),2,9);cx2.fillText(fmtHz(mn),2,H-3);cx2.fillText('← history',W-60,H-3);
+}
+
+// ═══════════════════════════════════════════════
+//  MAIN LOOP
+// ═══════════════════════════════════════════════
+let frameCount=0;
 function animate(){
     drawRadar();
-    updateDisplay();
+    computeLiveDoppler();
+    frameCount++;
+    if(frameCount%3===0) renderLiveDoppler();
+    if(frameCount%30===0) updateDisplay();
     requestAnimationFrame(animate);
 }
+
+// ═══════════════════════════════════════════════
+//  VIEW SWITCHER
+// ═══════════════════════════════════════════════
+let currentView = 'radar';
+function switchView(view) {
+    currentView = view;
+    const radar     = document.getElementById('radarContainer');
+    const controls  = document.getElementById('controlsPanel');
+    const doppler   = document.getElementById('dopplerPanel');
+    const tabRadar  = document.getElementById('tabRadar');
+    const tabDop    = document.getElementById('tabDoppler');
+
+    if (view === 'radar') {
+        radar.style.display   = '';
+        controls.style.display = '';
+        doppler.classList.remove('expanded');
+        document.body.classList.remove('doppler-view');
+        tabRadar.classList.add('active-tab');
+        tabDop.classList.remove('active-tab');
+    } else {
+        radar.style.display   = 'none';
+        controls.style.display = 'none';
+        doppler.classList.add('expanded');
+        document.body.classList.add('doppler-view');
+        tabDop.classList.add('active-tab');
+        tabRadar.classList.remove('active-tab');
+        // Re-render all canvases at new sizes after layout settles
+        setTimeout(() => {
+            drawAllWaveforms(
+                +document.getElementById('dp_fc').value,
+                +document.getElementById('dp_vt').value,
+                +document.getElementById('dp_vr').value,
+                +document.getElementById('dp_theta').value
+            );
+            renderLiveDoppler();
+        }, 60);
+    }
+}
+
+// Boot
+initThreats();createUI();updateDisplay();
+drawAllWaveforms(
+    +document.getElementById('dp_fc').value,
+    +document.getElementById('dp_vt').value,
+    +document.getElementById('dp_vr').value,
+    +document.getElementById('dp_theta').value
+);
 animate();
 </script>
 </body>
