@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EW Radar + Doppler Engine — Su-30MKI</title>
+    <title>EW Radar + Doppler Engine</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -394,7 +394,7 @@
 
 <!-- ══ RADAR CANVAS ══ -->
 <div class="radar-container" id="radarContainer">
-    <div class="radar-title">EW THREAT DISPLAY — SU-30MKI</div>
+    <div class="radar-title">EW THREAT DISPLAY</div>
     <div class="pause-banner" id="pauseBanner">⏸ SIMULATION PAUSED — PRESS [SPACE] TO RESUME</div>
     <canvas id="radarCanvas" width="700" height="700"></canvas>
 </div>
@@ -414,7 +414,7 @@
         <div class="info-row"><span class="info-label">Active Threats:</span><span class="info-value" id="activeThreatsCount">1</span></div>
         <div class="info-row"><span class="info-label">Detected by Sweep:</span><span class="info-value" id="detectedCount">0</span></div>
         <div class="info-row"><span class="info-label">Enemy Aircraft:</span><span class="info-value" id="enemyStatusInfo">STANDBY</span></div>
-        <div class="info-row"><span class="info-label">Aircraft:</span><span class="info-value">Su-30MKI</span></div>
+        <div class="info-row"><span class="info-label">Aircraft:</span><span class="info-value">CLASSIFIED</span></div>
         <div class="info-row"><span class="info-label">SIM STATUS:</span><span class="info-value" id="simStatus">RUNNING</span></div>
     </div>
     <div class="threats-section">
@@ -1029,7 +1029,7 @@ function drawSymbol(th) {
 }
 
 // ═══════════════════════════════════════════════
-//  SU-30MKI AIRCRAFT — twin-engine flanker top-down
+//  AIRCRAFT — twin-engine top-down
 // ═══════════════════════════════════════════════
 function drawAircraft() {
     ctx.save();ctx.translate(CX,CY);
@@ -1119,9 +1119,8 @@ function drawEnemyAlert(){
 function drawRadar(){
     ctx.fillStyle='#050814';ctx.fillRect(0,0,canvas.width,canvas.height);
     ctx.strokeStyle='#1a3a52';ctx.lineWidth=2;ctx.strokeRect(1,1,canvas.width-2,canvas.height-2);
-    // Su-30MKI style: right half green (45° to -135°), left half darker
-    ctx.fillStyle='rgba(0,255,0,0.06)';ctx.beginPath();ctx.moveTo(CX,CY);ctx.arc(CX,CY,MAX_R,deg2rad(45-90),deg2rad(225-90));ctx.closePath();ctx.fill();
-    ctx.fillStyle='rgba(100,200,255,0.04)';ctx.beginPath();ctx.moveTo(CX,CY);ctx.arc(CX,CY,MAX_R,deg2rad(225-90),deg2rad(405-90));ctx.closePath();ctx.fill();
+    // Plain dark radar background
+    ctx.fillStyle='rgba(0,20,15,0.4)';ctx.beginPath();ctx.arc(CX,CY,MAX_R,0,Math.PI*2);ctx.fill();
     for(let i=1;i<=10;i++){
         const r=kmToPx(i*20);
         ctx.strokeStyle='#1a3a52';ctx.lineWidth=1;
@@ -1216,7 +1215,7 @@ function runScenario(){
     else{rs.enemy={active:false,phase:'standby',x:0,y:0,angle:0,entryAngle:135,dropRange:60,ingressSpeed:4,egressSpeed:7,missileSpeed:6,missileCount:2,progress:0,trail:[],missiles:[],flashTimer:0};}
     createUI();updateDisplay();
 }
-const LS_KEY='su30mki_saved_scenarios';
+const LS_KEY='ew_radar_saved_scenarios';
 function getSavedScenarios(){try{return JSON.parse(localStorage.getItem(LS_KEY)||'{}');}catch(e){return {};}}
 function getAllScenarios(){return{...BUILTIN_SCENARIOS,...getSavedScenarios()};}
 function saveCurrentScenario(){
