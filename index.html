@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EW Radar + Doppler Engine</title>
+    <title>Radar Signal Simulator + Doppler Analyser</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -350,30 +350,30 @@
 
 <!-- ══ SCENARIO BAR ══ -->
 <div class="scenario-bar">
-    <div class="scenario-bar-title">📋 SCENARIO</div>
+    <div class="scenario-bar-title">📋 TEST CASE</div>
     <select id="scenarioSelect" onchange="onScenarioChange()">
-        <option value="">— Select a Scenario —</option>
+        <option value="">— Select a Test Case —</option>
         <optgroup label="── BASIC ──">
-            <option value="single_search">01 · Single Search Emitter</option>
-            <option value="single_missile">02 · Inbound Missile Threat</option>
+            <option value="single_search">01 · Single Emitter (Static)</option>
+            <option value="single_missile">02 · Single Emitter (Inbound Parabolic)</option>
         </optgroup>
-        <optgroup label="── MULTI-THREAT ──">
-            <option value="pincer_attack">03 · Pincer Attack (2 Track Radars)</option>
-            <option value="sam_battery">04 · SAM Battery (Acquisition + Missile)</option>
-            <option value="saturation">05 · Saturation — 6 Mixed Emitters</option>
+        <optgroup label="── MULTI-EMITTER ──">
+            <option value="pincer_attack">03 · Dual Converging Emitters</option>
+            <option value="sam_battery">04 · Acquisition + Two Tracked Emitters</option>
+            <option value="saturation">05 · Multi-Emitter 360° Coverage</option>
         </optgroup>
-        <optgroup label="── DYNAMIC ──">
-            <option value="pop_up_threat">06 · Pop-Up Threat (S-Curve Ingress)</option>
-            <option value="escort_jamming">07 · Escort Formation (TWS + Search)</option>
-            <option value="cruise_missile_salvo">08 · Cruise Missile Salvo (4 Missiles)</option>
+        <optgroup label="── DYNAMIC PATH ──">
+            <option value="pop_up_threat">06 · S-Curve Trajectory Demo</option>
+            <option value="escort_jamming">07 · Outbound Formation (Two Emitters)</option>
+            <option value="cruise_missile_salvo">08 · Four-Emitter Inbound Parabolic</option>
         </optgroup>
         <optgroup label="── ADVANCED ──">
-            <option value="ambush">09 · Ambush — Multiple Arcs</option>
-            <option value="full_attack">10 · Full Strike Package</option>
+            <option value="ambush">09 · Multi-Arc Convergence Test</option>
+            <option value="full_attack">10 · High-Density Mixed Emitter Test</option>
         </optgroup>
-        <optgroup label="── C-HOOK ──">
-            <option value="c_hook_tail">11 · C-Hook Tail Chase (L+R)</option>
-            <option value="cross_straight">12 · Parallel Pass (L+R)</option>
+        <optgroup label="── CURVED PATH ──">
+            <option value="c_hook_tail">11 · Hook Trajectory Demo (L+R)</option>
+            <option value="cross_straight">12 · Parallel Linear Path (L+R)</option>
         </optgroup>
         <optgroup label="── SAVED ──" id="savedOptGroup"></optgroup>
     </select>
@@ -394,7 +394,7 @@
 
 <!-- ══ RADAR CANVAS ══ -->
 <div class="radar-container" id="radarContainer">
-    <div class="radar-title">EW THREAT DISPLAY</div>
+    <div class="radar-title">RADAR SIGNAL DISPLAY — SIMULATION</div>
     <div class="pause-banner" id="pauseBanner">⏸ SIMULATION PAUSED — PRESS [SPACE] TO RESUME</div>
     <canvas id="radarCanvas" width="700" height="700"></canvas>
 </div>
@@ -413,8 +413,8 @@
     <div class="info-display">
         <div class="info-row"><span class="info-label">Active Threats:</span><span class="info-value" id="activeThreatsCount">1</span></div>
         <div class="info-row"><span class="info-label">Detected by Sweep:</span><span class="info-value" id="detectedCount">0</span></div>
-        <div class="info-row"><span class="info-label">Enemy Aircraft:</span><span class="info-value" id="enemyStatusInfo">STANDBY</span></div>
-        <div class="info-row"><span class="info-label">Aircraft:</span><span class="info-value">CLASSIFIED</span></div>
+        <div class="info-row"><span class="info-label">Intruder:</span><span class="info-value" id="enemyStatusInfo">STANDBY</span></div>
+        <div class="info-row"><span class="info-label">Platform:</span><span class="info-value">GENERIC PLATFORM</span></div>
         <div class="info-row"><span class="info-label">SIM STATUS:</span><span class="info-value" id="simStatus">RUNNING</span></div>
     </div>
     <div class="threats-section">
@@ -439,23 +439,23 @@
 
     <!-- ENEMY -->
     <div class="enemy-section">
-        <div class="section-title">✈ ENEMY AIRCRAFT</div>
+        <div class="section-title">✈ INTRUDER PLATFORM</div>
         <div class="enemy-status-bar">
-            <span style="color:#ff6688;">MISSION PHASE:</span>
+            <span style="color:#ff6688;">STATUS:</span>
             <span class="enemy-phase-value" id="enemyPhaseDisplay">STANDBY</span>
         </div>
         <div class="enemy-panel">
             <div class="control-group"><label>ENTRY BEARING (°)</label><input type="number" id="enemyEntryAngle" min="-180" max="180" value="135" step="5"></div>
-            <div class="control-group"><label>DROP RANGE (km)</label><input type="number" id="enemyDropRange" min="20" max="150" value="60" step="10"></div>
+            <div class="control-group"><label>INTERCEPT RANGE (km)</label><input type="number" id="enemyDropRange" min="20" max="150" value="60" step="10"></div>
             <div class="row2">
-                <div class="control-group"><label>INGRESS SPEED (1–10)</label><input type="number" id="enemyIngressSpeed" min="1" max="10" value="4" step="1"></div>
-                <div class="control-group"><label>EGRESS SPEED (1–10)</label><input type="number" id="enemyEgressSpeed" min="1" max="10" value="7" step="1"></div>
+                <div class="control-group"><label>APPROACH SPEED (1–10)</label><input type="number" id="enemyIngressSpeed" min="1" max="10" value="4" step="1"></div>
+                <div class="control-group"><label>DEPART SPEED (1–10)</label><input type="number" id="enemyEgressSpeed" min="1" max="10" value="7" step="1"></div>
             </div>
-            <div class="control-group"><label>MISSILE SPEED (1–10)</label><input type="number" id="enemyMissileSpeed" min="1" max="10" value="6" step="1"></div>
-            <div class="control-group"><label>MISSILES TO DROP (1–4)</label><input type="number" id="enemyMissileCount" min="1" max="4" value="2" step="1"></div>
+            <div class="control-group"><label>EMITTER SPEED (1–10)</label><input type="number" id="enemyMissileSpeed" min="1" max="10" value="6" step="1"></div>
+            <div class="control-group"><label>EMITTERS TO RELEASE (1–4)</label><input type="number" id="enemyMissileCount" min="1" max="4" value="2" step="1"></div>
         </div>
-        <button class="scramble-btn" id="scrambleBtn">⚠ SCRAMBLE ENEMY</button>
-        <button class="abort-btn" id="abortEnemyBtn">✕ ABORT MISSION</button>
+        <button class="scramble-btn" id="scrambleBtn">⚠ ACTIVATE INTRUDER</button>
+        <button class="abort-btn" id="abortEnemyBtn">✕ DEACTIVATE</button>
     </div>
 
     <div class="shortcut-hint">⌨ [SPACE] — PAUSE / RESUME ALL MOTION</div>
@@ -467,7 +467,7 @@
         <div class="legend-item"><div class="legend-symbol" style="background:rgba(255,68,255,0.2);border:1px solid #ff44ff;"></div><span style="color:#ff44ff;">Outbound Parabolic — arc away from centre</span></div>
         <div style="margin-top:8px;font-size:10px;color:#888;line-height:1.7;">
             <span style="color:#ffaa00;">●</span> Start &nbsp; <span style="color:#ff4444;">■</span> End<br>
-            □ Search | △ Track | ◇ TWS | ✱ Acq | ⊕ Missile | # Unknown<br>
+            □ Search | △ Track | ◇ TWS | ✱ Acq | ⊕ Emitter-E | # Unknown<br>
             <span style="color:#ffff00;">⚡ DETECTED</span> — swept by radar beam
         </div>
     </div>
@@ -483,11 +483,11 @@
             MANUAL DOPPLER CALCULATOR
         </div>
         <div class="dp-row">
-            <div><label>CARRIER FREQ (GHz)</label><input type="number" id="dp_fc" value="10" min="0.1" max="100" step="0.1"></div>
-            <div><label>TARGET SPEED (m/s)</label><input type="number" id="dp_vt" value="300" min="0" max="3000" step="10"></div>
+            <div><label>CARRIER FREQ (GHz)</label><input type="number" id="dp_fc" value="5" min="0.1" max="100" step="0.1"></div>
+            <div><label>EMITTER SPEED (m/s)</label><input type="number" id="dp_vt" value="100" min="0" max="3000" step="10"></div>
         </div>
         <div class="dp-row">
-            <div><label>RADAR SPEED (m/s)</label><input type="number" id="dp_vr" value="200" min="0" max="3000" step="10"></div>
+            <div><label>RECEIVER SPEED (m/s)</label><input type="number" id="dp_vr" value="80" min="0" max="3000" step="10"></div>
             <div><label>ANGLE θ (° for cases 3/6)</label><input type="number" id="dp_theta" value="45" min="-180" max="180" step="1"></div>
         </div>
         <div style="color:#664488;font-size:9px;margin-bottom:6px;letter-spacing:1px;">SELECT MOTION CASE:</div>
@@ -527,7 +527,7 @@
             <div><label>INITIAL Y (m)</label><input type="number" id="dvt_y0" value="30000" step="1000"></div>
         </div>
         <div class="dp-row">
-            <div><label>SPEED (m/s)</label><input type="number" id="dvt_v" value="300" min="1" max="3000" step="10"></div>
+            <div><label>SPEED (m/s)</label><input type="number" id="dvt_v" value="120" min="1" max="3000" step="10"></div>
             <div><label>ANGLE OF MOTION (°)</label><input type="number" id="dvt_theta" value="200" min="-180" max="360" step="5"></div>
         </div>
         <div class="dp-row">
@@ -548,9 +548,9 @@
 
     <!-- Live Doppler -->
     <div class="dp-live-section">
-        <div class="dp-live-title">⚡ LIVE DOPPLER — ACTIVE THREATS</div>
+        <div class="dp-live-title">⚡ LIVE DOPPLER — ACTIVE EMITTERS</div>
         <div style="font-size:9px;color:#2a1a52;margin-bottom:8px;">
-            Carrier: <input type="number" id="liveFC" value="10" min="0.1" max="100" step="0.1"
+            Carrier: <input type="number" id="liveFC" value="5" min="0.1" max="100" step="0.1"
             style="width:60px;padding:2px 4px;background:#02030a;border:1px solid #2a1a52;color:#cc88ff;font-size:9px;border-radius:2px;"> GHz &nbsp;|&nbsp; Updates live from radar canvas
         </div>
         <div id="liveDopplerList"></div>
@@ -579,7 +579,7 @@ const ctx    = canvas.getContext('2d');
 const CX = canvas.width  / 2;
 const CY = canvas.height / 2;
 const MAX_R  = 300;
-const MAX_KM = 200;
+const MAX_KM = 250;   // display range in km (simulation only)
 const PX_PER_KM = MAX_R / MAX_KM;
 
 const deg2rad = d => d * Math.PI / 180;
@@ -791,7 +791,7 @@ function createUI() {
                     <option value="scurve"             ${th.trajectory==='scurve'?'selected':''}>S-Curve — S-shaped path A→B</option>
                     <option value="inbound_parabolic"  ${th.trajectory==='inbound_parabolic'?'selected':''}>Inbound Parabolic — arc toward centre</option>
                     <option value="outbound_parabolic" ${th.trajectory==='outbound_parabolic'?'selected':''}>Outbound Parabolic — arc away from centre</option>
-                    <option value="c_hook"             ${th.trajectory==='c_hook'?'selected':''}>C-Hook — straight in, hook around, straight out</option>
+                    <option value="c_hook"             ${th.trajectory==='c_hook'?'selected':''}>Hook Curve — arc redirect path</option>
                 </select>
                 <span class="badge badge-straight" id="tb-${i}">▶ STRAIGHT</span>
             </div>
@@ -847,7 +847,7 @@ window.setTraj    = (i,tj)=>{
     const map={
         straight:['▶ STRAIGHT','badge-straight'], scurve:['〜 S-CURVE','badge-scurve'],
         inbound_parabolic:['⌒ INBOUND PARA','badge-inbound'],
-        outbound_parabolic:['⌣ OUTBOUND PARA','badge-outbound'], c_hook:['↩ C-HOOK','badge-chook'],
+        outbound_parabolic:['⌣ OUTBOUND PARA','badge-outbound'], c_hook:['↩ HOOK CURVE','badge-chook'],
     };
     const b=document.getElementById(`tb-${i}`); b.textContent=map[tj][0]; b.className=`badge ${map[tj][1]}`;
 };
@@ -1020,7 +1020,7 @@ function drawSymbol(th) {
     ctx.save();ctx.fillStyle='#fff';ctx.font='bold 10px Courier New';ctx.fillText('T'+th.id,sx+16,sy-6);
     if(th.detected&&th.detectedTimer>0){ctx.fillStyle='#ffff00';ctx.font='bold 9px Courier New';ctx.fillText('⚡DET',sx+16,sy+4);}
     else if(th.motionMode==='dynamic'){
-        const sn={straight:'STR',scurve:'S〜S',inbound_parabolic:'I⌒P',outbound_parabolic:'O⌣P',c_hook:'↩CHK'};
+        const sn={straight:'STR',scurve:'S〜S',inbound_parabolic:'I⌒P',outbound_parabolic:'O⌣P',c_hook:'↩HRV'};
         ctx.fillStyle='#00ffaa';ctx.font='8px Courier New';ctx.fillText(sn[th.trajectory]||'DYN',sx+16,sy+4);
         const {r,g,b}=hexRGB(th.color);ctx.fillStyle=`rgba(${r},${g},${b},0.7)`;
         ctx.fillRect(sx+16,sy+7,th.t*22,2);ctx.strokeStyle='#333';ctx.lineWidth=0.5;ctx.strokeRect(sx+16,sy+7,22,2);
@@ -1029,25 +1029,32 @@ function drawSymbol(th) {
 }
 
 // ═══════════════════════════════════════════════
-//  AIRCRAFT — twin-engine top-down
+//  GENERIC PLATFORM — diamond arrow silhouette
 // ═══════════════════════════════════════════════
 function drawAircraft() {
-    ctx.save();ctx.translate(CX,CY);
-    ctx.fillStyle='#00ddff';ctx.strokeStyle='#00ffff';ctx.lineWidth=1.4;
-    // Fuselage — long needle body
-    ctx.beginPath();ctx.moveTo(0,-22);ctx.lineTo(-2.5,11);ctx.lineTo(2.5,11);ctx.closePath();ctx.fill();ctx.stroke();
-    // Main swept wings
-    ctx.beginPath();ctx.moveTo(-16,0);ctx.lineTo(16,0);ctx.lineTo(12,8);ctx.lineTo(-12,8);ctx.closePath();ctx.fill();ctx.stroke();
-    // Tail fins (left & right)
-    [[-6,7,-9,16,-4,16],[6,7,9,16,4,16]].forEach(([x1,y1,x2,y2,x3,y3])=>{
-        ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.lineTo(x3,y3);ctx.closePath();ctx.fill();ctx.stroke();
-    });
-    // Twin engine nozzles
-    ctx.fillStyle='#0088aa';
-    ctx.beginPath();ctx.arc(-4,13,2.5,0,Math.PI*2);ctx.fill();
-    ctx.beginPath();ctx.arc( 4,13,2.5,0,Math.PI*2);ctx.fill();
+    ctx.save(); ctx.translate(CX, CY);
+    ctx.fillStyle = '#00ddff'; ctx.strokeStyle = '#00ffff'; ctx.lineWidth = 1.4;
+    // Main diamond body
+    ctx.beginPath();
+    ctx.moveTo(0, -22);   // nose
+    ctx.lineTo(14, 6);    // right wing tip
+    ctx.lineTo(6, 12);    // right wing trailing
+    ctx.lineTo(0, 8);     // tail centre-top
+    ctx.lineTo(-6, 12);   // left wing trailing
+    ctx.lineTo(-14, 6);   // left wing tip
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    // Tail fin
+    ctx.beginPath();
+    ctx.moveTo(0, 8);
+    ctx.lineTo(3, 18);
+    ctx.lineTo(0, 16);
+    ctx.lineTo(-3, 18);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
     // Cockpit dot
-    ctx.fillStyle='#ff0000';ctx.beginPath();ctx.arc(0,-10,2.5,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(0, -10, 2.5, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
 }
 
@@ -1066,11 +1073,11 @@ function scrambleEnemy(){
     e.active=true;e.phase='ingress';e.progress=0;e.trail=[];e.missiles=[];e.flashTimer=0;
     const sp=polarToXY(e.entryAngle,MAX_KM+15);e.x=sp.x;e.y=sp.y;e.angle=e.entryAngle+180;
     document.getElementById('scrambleBtn').classList.add('active-mission');
-    document.getElementById('scrambleBtn').textContent='⚡ MISSION ACTIVE';
+    document.getElementById('scrambleBtn').textContent='⚡ INTRUDER ACTIVE';
     updateDisplay();
 }
 function abortEnemy(){ const e=rs.enemy;e.active=false;e.phase='standby';e.progress=0;e.trail=[];e.missiles=[];resetScrambleBtn();updateDisplay(); }
-function resetScrambleBtn(){ const b=document.getElementById('scrambleBtn');b.classList.remove('active-mission');b.textContent='⚠ SCRAMBLE ENEMY';b.disabled=false; }
+function resetScrambleBtn(){ const b=document.getElementById('scrambleBtn');b.classList.remove('active-mission');b.textContent='⚠ ACTIVATE INTRUDER';b.disabled=false; }
 function updateEnemy(){
     const e=rs.enemy;if(!e.active||e.phase==='standby'||e.phase==='done') return;
     if(paused) return;
@@ -1098,7 +1105,7 @@ function drawEnemy(){
         ctx.fillStyle='#ffff00';ctx.beginPath();ctx.arc(0,0,3,0,Math.PI*2);ctx.fill();
     }
     ctx.restore();
-    ctx.save();ctx.fillStyle='#ff3366';ctx.font='bold 11px Courier New';ctx.fillText('BOGEY',e.x+14,e.y-14);
+    ctx.save();ctx.fillStyle='#ff3366';ctx.font='bold 11px Courier New';ctx.fillText('INTRUDER',e.x+14,e.y-14);
     const pc={ingress:'#ff8888',drop:'#ffff00',egress:'#88ff88'};ctx.fillStyle=pc[e.phase]||'#ff3366';ctx.font='9px Courier New';ctx.fillText(e.phase.toUpperCase(),e.x+14,e.y-4);ctx.restore();
     if(isD&&e.flashTimer%8<4){ctx.strokeStyle='rgba(255,255,0,0.6)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(e.x,e.y,22,0,Math.PI*2);ctx.stroke();ctx.strokeStyle='rgba(255,0,68,0.4)';ctx.lineWidth=1;ctx.beginPath();ctx.arc(e.x,e.y,32,0,Math.PI*2);ctx.stroke();}
 }
@@ -1109,7 +1116,7 @@ function drawMissile(m){
 }
 function drawEnemyAlert(){
     const e=rs.enemy;const am=e.missiles.filter(m=>!m.done&&m.progress>.1);if(!am.length)return;
-    if(Math.floor(Date.now()/400)%2===0){ctx.save();ctx.fillStyle='rgba(255,0,68,0.9)';ctx.font='bold 14px Courier New';ctx.fillText('⚠ MISSILE INBOUND',CX+60,30);ctx.restore();}
+    if(Math.floor(Date.now()/400)%2===0){ctx.save();ctx.fillStyle='rgba(255,0,68,0.9)';ctx.font='bold 14px Courier New';ctx.fillText('⚠ EMITTER INBOUND',CX+60,30);ctx.restore();}
     am.forEach(m=>{ctx.strokeStyle='rgba(255,80,0,0.2)';ctx.lineWidth=1;ctx.setLineDash([3,6]);ctx.beginPath();ctx.moveTo(m.cx,m.cy);ctx.lineTo(m.tx,m.ty);ctx.stroke();ctx.setLineDash([]);});
 }
 
@@ -1142,7 +1149,7 @@ function drawRadar(){
 }
 
 function updateDisplay(){
-    const ph={standby:'STANDBY',ingress:'INGRESS ►',drop:'DROP ⚠',egress:'EGRESS ◄',done:'RTB'};
+    const ph={standby:'STANDBY',ingress:'APPROACH ►',drop:'RELEASE ⚠',egress:'DEPART ◄',done:'COMPLETE'};
     document.getElementById('activeThreatsCount').textContent=rs.numThreats;
     document.getElementById('enemyStatusInfo').textContent=ph[rs.enemy.phase]||'STANDBY';
     document.getElementById('enemyPhaseDisplay').textContent=ph[rs.enemy.phase]||'STANDBY';
@@ -1176,18 +1183,18 @@ document.getElementById('abortEnemyBtn').addEventListener('click',abortEnemy);
 //  SCENARIOS
 // ═══════════════════════════════════════════════
 const BUILTIN_SCENARIOS = {
-    single_search:{name:'Single Search Emitter',desc:"A lone search radar at 11 o'clock, 120 km.",sweep:{active:true,speed:3,width:12,range:180},threats:[{id:1,threatType:'search',color:'#ff2200',motionMode:'static',scanDirection:-30,scanAngle:35,range:120,numPages:2,trajectory:'straight',startBearing:-30,startRange:120,endBearing:10,endRange:80,velocity:0.003,divergeRange:60}],enemy:null},
-    single_missile:{name:'Inbound Missile Threat',desc:'Single missile from 6 o\'clock, inbound parabolic.',sweep:{active:true,speed:5,width:18,range:200},threats:[{id:1,threatType:'missile',color:'#ff8800',motionMode:'dynamic',scanDirection:180,scanAngle:10,range:160,numPages:1,trajectory:'inbound_parabolic',startBearing:175,startRange:180,endBearing:180,endRange:8,velocity:0.006,divergeRange:60}],enemy:null},
-    pincer_attack:{name:'Pincer Attack',desc:'Two track radars converging from 10 and 2 o\'clock.',sweep:{active:true,speed:4,width:14,range:200},threats:[{id:1,threatType:'track',color:'#ffee00',motionMode:'dynamic',scanDirection:-60,scanAngle:20,range:130,numPages:1,trajectory:'inbound_parabolic',startBearing:-60,startRange:160,endBearing:-40,endRange:20,velocity:0.004,divergeRange:60},{id:2,threatType:'track',color:'#00ddff',motionMode:'dynamic',scanDirection:60,scanAngle:20,range:130,numPages:1,trajectory:'inbound_parabolic',startBearing:60,startRange:160,endBearing:40,endRange:20,velocity:0.004,divergeRange:60}],enemy:null},
-    sam_battery:{name:'SAM Battery',desc:'Acquisition radar then two missiles launch.',sweep:{active:true,speed:3,width:10,range:150},threats:[{id:1,threatType:'acquisition',color:'#ff00cc',motionMode:'static',scanDirection:90,scanAngle:55,range:80,numPages:2,trajectory:'straight',startBearing:90,startRange:80,endBearing:90,endRange:80,velocity:0.003,divergeRange:60},{id:2,threatType:'missile',color:'#ff4400',motionMode:'dynamic',scanDirection:85,scanAngle:10,range:60,numPages:1,trajectory:'inbound_parabolic',startBearing:82,startRange:78,endBearing:85,endRange:5,velocity:0.007,divergeRange:60},{id:3,threatType:'missile',color:'#ff6600',motionMode:'dynamic',scanDirection:95,scanAngle:10,range:60,numPages:1,trajectory:'inbound_parabolic',startBearing:98,startRange:78,endBearing:95,endRange:5,velocity:0.007,divergeRange:60}],enemy:null},
-    saturation:{name:'Saturation — 6 Mixed Emitters',desc:'6 different emitter types spread 360°.',sweep:{active:true,speed:2,width:8,range:200},threats:[{id:1,threatType:'search',color:'#ff2200',motionMode:'static',scanDirection:0,scanAngle:35,range:130,numPages:2,trajectory:'straight',startBearing:0,startRange:130,endBearing:40,endRange:90,velocity:0.003,divergeRange:60},{id:2,threatType:'track',color:'#ffee00',motionMode:'static',scanDirection:60,scanAngle:20,range:100,numPages:1,trajectory:'straight',startBearing:60,startRange:100,endBearing:80,endRange:60,velocity:0.004,divergeRange:60},{id:3,threatType:'trackWhileScan',color:'#00ff44',motionMode:'static',scanDirection:130,scanAngle:10,range:90,numPages:1,trajectory:'straight',startBearing:130,startRange:90,endBearing:150,endRange:50,velocity:0.003,divergeRange:60},{id:4,threatType:'acquisition',color:'#ff00cc',motionMode:'static',scanDirection:200,scanAngle:55,range:80,numPages:2,trajectory:'straight',startBearing:200,startRange:80,endBearing:200,endRange:80,velocity:0.003,divergeRange:60},{id:5,threatType:'missile',color:'#ff8800',motionMode:'static',scanDirection:280,scanAngle:10,range:60,numPages:1,trajectory:'straight',startBearing:280,startRange:60,endBearing:280,endRange:60,velocity:0.003,divergeRange:60},{id:6,threatType:'unknown',color:'#0088ff',motionMode:'static',scanDirection:340,scanAngle:180,range:50,numPages:1,trajectory:'straight',startBearing:340,startRange:50,endBearing:340,endRange:50,velocity:0.003,divergeRange:60}],enemy:null},
-    pop_up_threat:{name:'Pop-Up Threat (S-Curve)',desc:'TWS emitter, evasive S-curve ingress.',sweep:{active:true,speed:4,width:16,range:200},threats:[{id:1,threatType:'trackWhileScan',color:'#00ff44',motionMode:'dynamic',scanDirection:-135,scanAngle:10,range:150,numPages:1,trajectory:'scurve',startBearing:-130,startRange:180,endBearing:-100,endRange:15,velocity:0.003,divergeRange:60}],enemy:{active:true,entryAngle:-130,dropRange:40,ingressSpeed:4,egressSpeed:7,missileSpeed:6,missileCount:2}},
-    escort_jamming:{name:'Escort Formation',desc:'TWS escorts Search radar outbound.',sweep:{active:true,speed:3,width:14,range:200},threats:[{id:1,threatType:'search',color:'#ff2200',motionMode:'dynamic',scanDirection:45,scanAngle:30,range:120,numPages:2,trajectory:'outbound_parabolic',startBearing:30,startRange:60,endBearing:60,endRange:180,velocity:0.003,divergeRange:60},{id:2,threatType:'trackWhileScan',color:'#00ff44',motionMode:'dynamic',scanDirection:50,scanAngle:10,range:100,numPages:1,trajectory:'outbound_parabolic',startBearing:50,startRange:55,endBearing:65,endRange:175,velocity:0.003,divergeRange:60}],enemy:null},
-    cruise_missile_salvo:{name:'Cruise Missile Salvo',desc:'4 cruise missiles from 12 o\'clock staggered.',sweep:{active:true,speed:6,width:20,range:200},threats:[{id:1,threatType:'missile',color:'#ff8800',motionMode:'dynamic',scanDirection:-10,scanAngle:10,range:150,numPages:1,trajectory:'inbound_parabolic',startBearing:-12,startRange:190,endBearing:-8,endRange:6,velocity:0.005,divergeRange:60},{id:2,threatType:'missile',color:'#ffaa00',motionMode:'dynamic',scanDirection:5,scanAngle:10,range:150,numPages:1,trajectory:'inbound_parabolic',startBearing:3,startRange:190,endBearing:6,endRange:6,velocity:0.005,divergeRange:60},{id:3,threatType:'missile',color:'#ff6600',motionMode:'dynamic',scanDirection:-20,scanAngle:10,range:150,numPages:1,trajectory:'inbound_parabolic',startBearing:-22,startRange:185,endBearing:-15,endRange:6,velocity:0.005,divergeRange:60},{id:4,threatType:'missile',color:'#ff4400',motionMode:'dynamic',scanDirection:15,scanAngle:10,range:150,numPages:1,trajectory:'inbound_parabolic',startBearing:14,startRange:185,endBearing:18,endRange:6,velocity:0.005,divergeRange:60}],enemy:null},
-    ambush:{name:'Ambush — Multiple Arcs',desc:'3 threats + enemy aircraft ambush.',sweep:{active:true,speed:4,width:15,range:200},threats:[{id:1,threatType:'track',color:'#ffee00',motionMode:'dynamic',scanDirection:-90,scanAngle:20,range:140,numPages:1,trajectory:'inbound_parabolic',startBearing:-90,startRange:170,endBearing:-70,endRange:12,velocity:0.004,divergeRange:60},{id:2,threatType:'acquisition',color:'#ff00cc',motionMode:'dynamic',scanDirection:90,scanAngle:40,range:120,numPages:2,trajectory:'scurve',startBearing:100,startRange:160,endBearing:70,endRange:15,velocity:0.003,divergeRange:60},{id:3,threatType:'missile',color:'#ff4400',motionMode:'dynamic',scanDirection:175,scanAngle:10,range:150,numPages:1,trajectory:'straight',startBearing:175,startRange:185,endBearing:178,endRange:5,velocity:0.006,divergeRange:60}],enemy:{active:true,entryAngle:90,dropRange:50,ingressSpeed:5,egressSpeed:8,missileSpeed:7,missileCount:2}},
-    full_attack:{name:'Full Strike Package',desc:'Maximum threat density + enemy aircraft.',sweep:{active:true,speed:5,width:12,range:200},threats:[{id:1,threatType:'search',color:'#ff2200',motionMode:'static',scanDirection:-45,scanAngle:35,range:160,numPages:2,trajectory:'straight',startBearing:-45,startRange:160,endBearing:-20,endRange:100,velocity:0.003,divergeRange:60},{id:2,threatType:'trackWhileScan',color:'#00ff44',motionMode:'dynamic',scanDirection:120,scanAngle:10,range:110,numPages:1,trajectory:'scurve',startBearing:110,startRange:155,endBearing:130,endRange:20,velocity:0.003,divergeRange:60},{id:3,threatType:'acquisition',color:'#ff00cc',motionMode:'static',scanDirection:155,scanAngle:55,range:80,numPages:2,trajectory:'straight',startBearing:155,startRange:80,endBearing:155,endRange:80,velocity:0.003,divergeRange:60},{id:4,threatType:'missile',color:'#ff8800',motionMode:'dynamic',scanDirection:160,scanAngle:10,range:80,numPages:1,trajectory:'inbound_parabolic',startBearing:158,startRange:78,endBearing:162,endRange:5,velocity:0.006,divergeRange:60},{id:5,threatType:'unknown',color:'#0088ff',motionMode:'static',scanDirection:-160,scanAngle:180,range:55,numPages:1,trajectory:'straight',startBearing:-160,startRange:55,endBearing:-160,endRange:55,velocity:0.003,divergeRange:60}],enemy:{active:true,entryAngle:120,dropRange:55,ingressSpeed:5,egressSpeed:8,missileSpeed:7,missileCount:3}},
-    c_hook_tail:{name:'C-Hook Tail Chase (L+R)',desc:'Two tracks approach from 12 o\'clock, C-curve inward.',sweep:{active:true,speed:4,width:14,range:200},threats:[{id:1,threatType:'track',color:'#ffee00',motionMode:'dynamic',scanDirection:-20,scanAngle:20,range:140,numPages:1,trajectory:'c_hook',divergeRange:100,startBearing:-20,startRange:185,endBearing:-20,endRange:185,velocity:0.004},{id:2,threatType:'track',color:'#00ddff',motionMode:'dynamic',scanDirection:20,scanAngle:20,range:140,numPages:1,trajectory:'c_hook',divergeRange:100,startBearing:20,startRange:185,endBearing:20,endRange:185,velocity:0.004}],enemy:null},
-    cross_straight:{name:'Parallel Pass — Left & Right',desc:'Two missiles fly parallel, left and right lanes.',sweep:{active:true,speed:5,width:16,range:200},threats:[{id:1,threatType:'missile',color:'#ff4400',motionMode:'dynamic',scanDirection:-20,scanAngle:10,range:160,numPages:1,trajectory:'straight',startBearing:-20,startRange:185,endBearing:-160,endRange:185,velocity:0.004,divergeRange:60},{id:2,threatType:'missile',color:'#ff8800',motionMode:'dynamic',scanDirection:20,scanAngle:10,range:160,numPages:1,trajectory:'straight',startBearing:20,startRange:185,endBearing:160,endRange:185,velocity:0.004,divergeRange:60}],enemy:null}
+    single_search:{name:'Single Emitter (Static)',desc:'A single static search-type emitter at bearing -30°, range 120 units. Activate sweep to detect.',sweep:{active:true,speed:3,width:12,range:180},threats:[{id:1,threatType:'search',color:'#ff2200',motionMode:'static',scanDirection:-30,scanAngle:35,range:120,numPages:2,trajectory:'straight',startBearing:-30,startRange:120,endBearing:10,endRange:80,velocity:0.003,divergeRange:60}],enemy:null},
+    single_missile:{name:'Single Emitter (Inbound Parabolic)',desc:'One dynamic emitter following an inbound parabolic path from bearing 175°.',sweep:{active:true,speed:5,width:18,range:200},threats:[{id:1,threatType:'missile',color:'#ff8800',motionMode:'dynamic',scanDirection:180,scanAngle:10,range:160,numPages:1,trajectory:'inbound_parabolic',startBearing:175,startRange:180,endBearing:180,endRange:8,velocity:0.006,divergeRange:60}],enemy:null},
+    pincer_attack:{name:'Dual Converging Emitters',desc:'Two dynamic track-type emitters on inbound parabolic paths converging from opposing bearings.',sweep:{active:true,speed:4,width:14,range:200},threats:[{id:1,threatType:'track',color:'#ffee00',motionMode:'dynamic',scanDirection:-60,scanAngle:20,range:130,numPages:1,trajectory:'inbound_parabolic',startBearing:-60,startRange:160,endBearing:-40,endRange:20,velocity:0.004,divergeRange:60},{id:2,threatType:'track',color:'#00ddff',motionMode:'dynamic',scanDirection:60,scanAngle:20,range:130,numPages:1,trajectory:'inbound_parabolic',startBearing:60,startRange:160,endBearing:40,endRange:20,velocity:0.004,divergeRange:60}],enemy:null},
+    sam_battery:{name:'Acquisition + Two Tracked Emitters',desc:'Static acquisition-type emitter with two dynamic emitters on inbound parabolic paths.',sweep:{active:true,speed:3,width:10,range:150},threats:[{id:1,threatType:'acquisition',color:'#ff00cc',motionMode:'static',scanDirection:90,scanAngle:55,range:80,numPages:2,trajectory:'straight',startBearing:90,startRange:80,endBearing:90,endRange:80,velocity:0.003,divergeRange:60},{id:2,threatType:'missile',color:'#ff4400',motionMode:'dynamic',scanDirection:85,scanAngle:10,range:60,numPages:1,trajectory:'inbound_parabolic',startBearing:82,startRange:78,endBearing:85,endRange:5,velocity:0.007,divergeRange:60},{id:3,threatType:'missile',color:'#ff6600',motionMode:'dynamic',scanDirection:95,scanAngle:10,range:60,numPages:1,trajectory:'inbound_parabolic',startBearing:98,startRange:78,endBearing:95,endRange:5,velocity:0.007,divergeRange:60}],enemy:null},
+    saturation:{name:'Multi-Emitter 360° Coverage',desc:'Six emitters of different types distributed across all bearings — tests full-coverage detection.',sweep:{active:true,speed:2,width:8,range:200},threats:[{id:1,threatType:'search',color:'#ff2200',motionMode:'static',scanDirection:0,scanAngle:35,range:130,numPages:2,trajectory:'straight',startBearing:0,startRange:130,endBearing:40,endRange:90,velocity:0.003,divergeRange:60},{id:2,threatType:'track',color:'#ffee00',motionMode:'static',scanDirection:60,scanAngle:20,range:100,numPages:1,trajectory:'straight',startBearing:60,startRange:100,endBearing:80,endRange:60,velocity:0.004,divergeRange:60},{id:3,threatType:'trackWhileScan',color:'#00ff44',motionMode:'static',scanDirection:130,scanAngle:10,range:90,numPages:1,trajectory:'straight',startBearing:130,startRange:90,endBearing:150,endRange:50,velocity:0.003,divergeRange:60},{id:4,threatType:'acquisition',color:'#ff00cc',motionMode:'static',scanDirection:200,scanAngle:55,range:80,numPages:2,trajectory:'straight',startBearing:200,startRange:80,endBearing:200,endRange:80,velocity:0.003,divergeRange:60},{id:5,threatType:'missile',color:'#ff8800',motionMode:'static',scanDirection:280,scanAngle:10,range:60,numPages:1,trajectory:'straight',startBearing:280,startRange:60,endBearing:280,endRange:60,velocity:0.003,divergeRange:60},{id:6,threatType:'unknown',color:'#0088ff',motionMode:'static',scanDirection:340,scanAngle:180,range:50,numPages:1,trajectory:'straight',startBearing:340,startRange:50,endBearing:340,endRange:50,velocity:0.003,divergeRange:60}],enemy:null},
+    pop_up_threat:{name:'S-Curve Trajectory Demo',desc:'Single TWS emitter following an S-curve path — demonstrates non-linear trajectory detection.',sweep:{active:true,speed:4,width:16,range:200},threats:[{id:1,threatType:'trackWhileScan',color:'#00ff44',motionMode:'dynamic',scanDirection:-135,scanAngle:10,range:150,numPages:1,trajectory:'scurve',startBearing:-130,startRange:180,endBearing:-100,endRange:15,velocity:0.003,divergeRange:60}],enemy:{active:true,entryAngle:-130,dropRange:40,ingressSpeed:4,egressSpeed:7,missileSpeed:6,missileCount:2}},
+    escort_jamming:{name:'Outbound Formation (Two Emitters)',desc:'Two emitters on outbound parabolic paths — tests detection of receding signals.',sweep:{active:true,speed:3,width:14,range:200},threats:[{id:1,threatType:'search',color:'#ff2200',motionMode:'dynamic',scanDirection:45,scanAngle:30,range:120,numPages:2,trajectory:'outbound_parabolic',startBearing:30,startRange:60,endBearing:60,endRange:180,velocity:0.003,divergeRange:60},{id:2,threatType:'trackWhileScan',color:'#00ff44',motionMode:'dynamic',scanDirection:50,scanAngle:10,range:100,numPages:1,trajectory:'outbound_parabolic',startBearing:50,startRange:55,endBearing:65,endRange:175,velocity:0.003,divergeRange:60}],enemy:null},
+    cruise_missile_salvo:{name:'Four-Emitter Inbound Parabolic',desc:'Four emitters on staggered inbound parabolic paths — tests multi-track detection.',sweep:{active:true,speed:6,width:20,range:200},threats:[{id:1,threatType:'missile',color:'#ff8800',motionMode:'dynamic',scanDirection:-10,scanAngle:10,range:150,numPages:1,trajectory:'inbound_parabolic',startBearing:-12,startRange:190,endBearing:-8,endRange:6,velocity:0.005,divergeRange:60},{id:2,threatType:'missile',color:'#ffaa00',motionMode:'dynamic',scanDirection:5,scanAngle:10,range:150,numPages:1,trajectory:'inbound_parabolic',startBearing:3,startRange:190,endBearing:6,endRange:6,velocity:0.005,divergeRange:60},{id:3,threatType:'missile',color:'#ff6600',motionMode:'dynamic',scanDirection:-20,scanAngle:10,range:150,numPages:1,trajectory:'inbound_parabolic',startBearing:-22,startRange:185,endBearing:-15,endRange:6,velocity:0.005,divergeRange:60},{id:4,threatType:'missile',color:'#ff4400',motionMode:'dynamic',scanDirection:15,scanAngle:10,range:150,numPages:1,trajectory:'inbound_parabolic',startBearing:14,startRange:185,endBearing:18,endRange:6,velocity:0.005,divergeRange:60}],enemy:null},
+    ambush:{name:'Multi-Arc Convergence Test',desc:'Three emitters on different trajectory types converging simultaneously with intruder platform.',sweep:{active:true,speed:4,width:15,range:200},threats:[{id:1,threatType:'track',color:'#ffee00',motionMode:'dynamic',scanDirection:-90,scanAngle:20,range:140,numPages:1,trajectory:'inbound_parabolic',startBearing:-90,startRange:170,endBearing:-70,endRange:12,velocity:0.004,divergeRange:60},{id:2,threatType:'acquisition',color:'#ff00cc',motionMode:'dynamic',scanDirection:90,scanAngle:40,range:120,numPages:2,trajectory:'scurve',startBearing:100,startRange:160,endBearing:70,endRange:15,velocity:0.003,divergeRange:60},{id:3,threatType:'missile',color:'#ff4400',motionMode:'dynamic',scanDirection:175,scanAngle:10,range:150,numPages:1,trajectory:'straight',startBearing:175,startRange:185,endBearing:178,endRange:5,velocity:0.006,divergeRange:60}],enemy:{active:true,entryAngle:90,dropRange:50,ingressSpeed:5,egressSpeed:8,missileSpeed:7,missileCount:2}},
+    full_attack:{name:'High-Density Mixed Emitter Test',desc:'Maximum emitter density across all types — stress test for multi-signal processing.',sweep:{active:true,speed:5,width:12,range:200},threats:[{id:1,threatType:'search',color:'#ff2200',motionMode:'static',scanDirection:-45,scanAngle:35,range:160,numPages:2,trajectory:'straight',startBearing:-45,startRange:160,endBearing:-20,endRange:100,velocity:0.003,divergeRange:60},{id:2,threatType:'trackWhileScan',color:'#00ff44',motionMode:'dynamic',scanDirection:120,scanAngle:10,range:110,numPages:1,trajectory:'scurve',startBearing:110,startRange:155,endBearing:130,endRange:20,velocity:0.003,divergeRange:60},{id:3,threatType:'acquisition',color:'#ff00cc',motionMode:'static',scanDirection:155,scanAngle:55,range:80,numPages:2,trajectory:'straight',startBearing:155,startRange:80,endBearing:155,endRange:80,velocity:0.003,divergeRange:60},{id:4,threatType:'missile',color:'#ff8800',motionMode:'dynamic',scanDirection:160,scanAngle:10,range:80,numPages:1,trajectory:'inbound_parabolic',startBearing:158,startRange:78,endBearing:162,endRange:5,velocity:0.006,divergeRange:60},{id:5,threatType:'unknown',color:'#0088ff',motionMode:'static',scanDirection:-160,scanAngle:180,range:55,numPages:1,trajectory:'straight',startBearing:-160,startRange:55,endBearing:-160,endRange:55,velocity:0.003,divergeRange:60}],enemy:{active:true,entryAngle:120,dropRange:55,ingressSpeed:5,egressSpeed:8,missileSpeed:7,missileCount:3}},
+    c_hook_tail:{name:'Hook Trajectory Demo (L+R)',desc:'Two emitters on hook-curve paths from bearing ±20° — demonstrates arc-redirect trajectory.',sweep:{active:true,speed:4,width:14,range:200},threats:[{id:1,threatType:'track',color:'#ffee00',motionMode:'dynamic',scanDirection:-20,scanAngle:20,range:140,numPages:1,trajectory:'c_hook',divergeRange:100,startBearing:-20,startRange:185,endBearing:-20,endRange:185,velocity:0.004},{id:2,threatType:'track',color:'#00ddff',motionMode:'dynamic',scanDirection:20,scanAngle:20,range:140,numPages:1,trajectory:'c_hook',divergeRange:100,startBearing:20,startRange:185,endBearing:20,endRange:185,velocity:0.004}],enemy:null},
+    cross_straight:{name:'Parallel Linear Path (L+R)',desc:'Two emitters on parallel straight paths — tests simultaneous bilateral tracking.',sweep:{active:true,speed:5,width:16,range:200},threats:[{id:1,threatType:'missile',color:'#ff4400',motionMode:'dynamic',scanDirection:-20,scanAngle:10,range:160,numPages:1,trajectory:'straight',startBearing:-20,startRange:185,endBearing:-160,endRange:185,velocity:0.004,divergeRange:60},{id:2,threatType:'missile',color:'#ff8800',motionMode:'dynamic',scanDirection:20,scanAngle:10,range:160,numPages:1,trajectory:'straight',startBearing:20,startRange:185,endBearing:160,endRange:185,velocity:0.004,divergeRange:60}],enemy:null}
 };
 
 function onScenarioChange(){
